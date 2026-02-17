@@ -1,0 +1,30 @@
+# Firebase
+.firebase/
+.firebaserc
+
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Firebase config (contains API keys)
+firebase-config.js
+
+# Logs
+*.log
+npm-debug.log*
+firebase-debug.log*
