@@ -2572,46 +2572,11 @@ function init() {
 }
 
 function initAuth() {
-    let isRedirectPending = true;
-
-    // Handle returning from Google redirect FIRST
-    Auth.handleRedirectResult().then(result => {
-        isRedirectPending = false;
-        if (result && result.user) {
-            updateAuthStrip(result.user);
-            showScreen('welcome');
-            // If this is a brand new account, show profile screen so they can choose a name
-            if (result.isNewUser) {
-                setTimeout(() => {
-                    showScreen('profile');
-                    populateProfileScreen(result.user);
-                }, 100);
-            }
-        } else {
-            // No redirect happened. If user is still null, process auto-guest login
-            const currentUser = Auth.getCurrentUser();
-            if (!currentUser) {
-                const hasVisited = localStorage.getItem('imposter-has-visited');
-                if (!hasVisited) {
-                    showScreen('onboarding');
-                } else {
-                    Auth.signInAsGuest().then(() => {
-                        showScreen('welcome');
-                    }).catch(e => console.warn(e));
-                }
-            } else {
-                showScreen('welcome');
-            }
-        }
-    }).catch(e => {
-        isRedirectPending = false;
-        console.error('handleRedirectResult error:', e);
-    });
 
     // Single auth state listener: update UI
     Auth.onAuthChange(async user => {
-        // Only run auto-guest logic here if we know there is NO pending redirect
-        if (!user && !isRedirectPending) {
+        // Only run auto-guest logic here if we know there's no auth yet
+        if (!user) {
             const hasVisited = localStorage.getItem('imposter-has-visited');
             if (!hasVisited) {
                 showScreen('onboarding');
@@ -2639,7 +2604,7 @@ function initAuth() {
                 elements.authorNameInput.placeholder = user.displayName;
             }
 
-            if (!isRedirectPending && document.querySelector('.screen.active')?.id === 'onboarding-screen') {
+            if (document.querySelector('.screen.active')?.id === 'onboarding-screen') {
                 showScreen('welcome');
             }
         }
@@ -2678,8 +2643,16 @@ function initAuth() {
         const originalText = elements.landingLoginBtn.querySelector('span').textContent;
         try {
             elements.landingLoginBtn.disabled = true;
-            elements.landingLoginBtn.querySelector('span').textContent = 'Redirecting…';
-            await Auth.signInWithGoogle();
+            elements.landingLoginBtn.querySelector('span').textContent = 'Connecting...';
+            const result = await Auth.signInWithGoogle();
+            if (result && result.user) {
+                if (result.isNewUser) {
+                    showScreen('profile');
+                    populateProfileScreen(result.user);
+                } else {
+                    showScreen('welcome');
+                }
+            }
         } catch (e) {
             elements.landingLoginBtn.disabled = false;
             elements.landingLoginBtn.querySelector('span').textContent = originalText;
@@ -2693,8 +2666,16 @@ function initAuth() {
         const originalText = elements.landingSignupBtn.querySelector('span').textContent;
         try {
             elements.landingSignupBtn.disabled = true;
-            elements.landingSignupBtn.querySelector('span').textContent = 'Redirecting…';
-            await Auth.signInWithGoogle();
+            elements.landingSignupBtn.querySelector('span').textContent = 'Connecting...';
+            const result = await Auth.signInWithGoogle();
+            if (result && result.user) {
+                if (result.isNewUser) {
+                    showScreen('profile');
+                    populateProfileScreen(result.user);
+                } else {
+                    showScreen('welcome');
+                }
+            }
         } catch (e) {
             elements.landingSignupBtn.disabled = false;
             elements.landingSignupBtn.querySelector('span').textContent = originalText;

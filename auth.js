@@ -8,8 +8,8 @@ import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.8.0
 import {
     getAuth,
     GoogleAuthProvider,
-    signInWithRedirect,
-    getRedirectResult,
+    signInWithPopup,
+    getAdditionalUserInfo,
     signInAnonymously,
     onAuthStateChanged,
     signOut as firebaseSignOut,
@@ -59,13 +59,18 @@ function getCurrentUid() {
 // ===============================================
 
 /**
- * Start Google sign-in via redirect.
+ * Start Google sign-in via popup.
  * Works for both new users (sign up) and existing users (log in).
- * Firebase/Google determines whether to create a new account or sign into existing.
  */
 async function signInWithGoogle() {
-    await signInWithRedirect(auth, googleProvider);
-    // Page redirects — result is handled by handleRedirectResult() on return
+    const result = await signInWithPopup(auth, googleProvider);
+    if (result && result.user) {
+        const isNewUser = getAdditionalUserInfo(result)?.isNewUser || false;
+        await ensureProfile(result.user);
+        await migrateLocalStorage(result.user.uid);
+        return { user: result.user, isNewUser };
+    }
+    return null;
 }
 
 /**
@@ -82,30 +87,6 @@ async function signInAsGuest() {
  */
 async function signOut() {
     await firebaseSignOut(auth);
-}
-
-// ===============================================
-// Redirect Result Handler
-// Called from index.js AFTER UI listeners are set up
-// ===============================================
-
-/**
- * Check if returning from a Google sign-in redirect and process the result.
- * Returns the signed-in user, or null if no redirect pending.
- */
-async function handleRedirectResult() {
-    try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-            const isNewUser = getAdditionalUserInfo(result)?.isNewUser || false;
-            await ensureProfile(result.user);
-            await migrateLocalStorage(result.user.uid);
-            return { user: result.user, isNewUser };
-        }
-    } catch (e) {
-        console.error('Redirect sign-in result error:', e);
-    }
-    return null;
 }
 
 // ===============================================
