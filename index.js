@@ -2566,28 +2566,54 @@ function init() {
 }
 
 function initAuth() {
-    // Single auth state listener: update UI + auto guest sign-in
+    let isRedirectPending = true;
+
+    // Handle returning from Google redirect FIRST
+    Auth.handleRedirectResult().then(result => {
+        isRedirectPending = false;
+        if (result && result.user) {
+            updateAuthStrip(result.user);
+            // If this is a brand new account, show profile screen so they can choose a name
+            if (result.isNewUser) {
+                setTimeout(() => {
+                    showScreen('profile');
+                    populateProfileScreen(result.user);
+                }, 100);
+            }
+        } else {
+            // No redirect happened. If user is still null, process auto-guest login
+            const currentUser = Auth.getCurrentUser();
+            if (!currentUser) {
+                const hasVisited = localStorage.getItem('imposter-has-visited');
+                if (!hasVisited) {
+                    showAuthModal();
+                } else {
+                    Auth.signInAsGuest().catch(e => console.warn(e));
+                }
+            }
+        }
+    }).catch(e => {
+        isRedirectPending = false;
+        console.error('handleRedirectResult error:', e);
+    });
+
+    // Single auth state listener: update UI
     Auth.onAuthChange(async user => {
         updateAuthStrip(user);
         if (user && user.displayName && elements.authorNameInput) {
             elements.authorNameInput.placeholder = user.displayName;
         }
-        // On first load: if no user at all (not even anonymous), show auth modal
-        if (!user) {
+
+        // Only run auto-guest logic here if we know there is NO pending redirect
+        if (!user && !isRedirectPending) {
             const hasVisited = localStorage.getItem('imposter-has-visited');
             if (!hasVisited) {
                 showAuthModal();
             } else {
-                // Returning visitor with no auth — auto guest
-                try { await Auth.signInAsGuest(); } catch (e) { console.warn(e); }
+                try { await Auth.signInAsGuest(); } catch (e) { console.warn('Guest sign-in failed:', e); }
             }
         }
     });
-
-    // Handle returning from Google redirect
-    Auth.handleRedirectResult().then(user => {
-        if (user) updateAuthStrip(user);
-    }).catch(e => console.error('handleRedirectResult error:', e));
 
     // Auth chip (avatar) — opens profile if signed in, auth modal if guest
     elements.authAvatarBtn.addEventListener('click', () => {

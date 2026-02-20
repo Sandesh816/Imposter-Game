@@ -13,7 +13,8 @@ import {
     signInAnonymously,
     onAuthStateChanged,
     signOut as firebaseSignOut,
-    updateProfile
+    updateProfile,
+    getAdditionalUserInfo
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
     getDatabase,
@@ -96,9 +97,10 @@ async function handleRedirectResult() {
     try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
+            const isNewUser = getAdditionalUserInfo(result)?.isNewUser || false;
             await ensureProfile(result.user);
             await migrateLocalStorage(result.user.uid);
-            return result.user;
+            return { user: result.user, isNewUser };
         }
     } catch (e) {
         console.error('Redirect sign-in result error:', e);
