@@ -20,6 +20,8 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+firebase-config.js
+
 
 # Logs
 *.log
