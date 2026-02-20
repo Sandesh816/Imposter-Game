@@ -19,8 +19,8 @@
         },
         "communityCategories": {
             ".read": "auth !== null",
-            ".write": "auth !== null",
             "$catId": {
+                ".write": "auth !== null",
                 "upvotedBy": {
                     "$uid": {
                         ".write": "$uid === auth.uid"
