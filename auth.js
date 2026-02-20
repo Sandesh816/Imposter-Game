@@ -77,7 +77,6 @@ async function signInWithGoogle() {
  */
 async function signInAsGuest() {
     const result = await signInAnonymously(auth);
-    await migrateLocalStorage(result.user.uid);
     return result.user;
 }
 
