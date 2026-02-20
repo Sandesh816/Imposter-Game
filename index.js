@@ -2383,6 +2383,9 @@ async function publishCustomCategory() {
     try {
         await CustomCat.publishCategory(saved, authorName);
         elements.publishStatus.textContent = '✅ Published to Community Hub!';
+        setTimeout(() => {
+            showCommunityHub();
+        }, 1200);
     } catch (e) {
         elements.publishStatus.textContent = '❌ Failed to publish. Try again.';
         elements.publishCatBtn.disabled = false;
@@ -2420,7 +2423,7 @@ function renderCommunityList(cats) {
     elements.communityLoading.classList.add('hidden');
     elements.communityList.innerHTML = '';
 
-    if (cats.length === 0) {
+    if (!cats || cats.length === 0) {
         elements.communityEmpty.classList.remove('hidden');
         elements.communityList.classList.add('hidden');
         return;
