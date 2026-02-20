@@ -14,13 +14,22 @@ import {
     update,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // Firebase configuration
 import { firebaseConfig } from "./firebase-config.js";
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+// Re-use auth-app (shared Firebase app instance)
+let mpApp;
+try {
+    mpApp = getApp();
+} catch {
+    mpApp = initializeApp(firebaseConfig);
+}
+
+const db = getDatabase(mpApp);
+const auth = getAuth(mpApp);
 
 // ===============================================
 // Multiplayer State

@@ -19,12 +19,12 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth
 // Firebase config (same as multiplayer.js)
 import { firebaseConfig } from "./firebase-config.js";
 
-// Re-use existing Firebase app instance if available
+// Re-use auth-app (shared Firebase app instance)
 let leagueApp;
 try {
-    leagueApp = getApp('auth-app'); // share with auth.js
+    leagueApp = getApp();
 } catch {
-    leagueApp = initializeApp(firebaseConfig, 'league-app-' + Date.now());
+    leagueApp = initializeApp(firebaseConfig);
 }
 
 const db = getDatabase(leagueApp);

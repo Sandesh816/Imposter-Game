@@ -29,9 +29,9 @@ import { firebaseConfig } from "./firebase-config.js";
 // Re-use existing Firebase app instance if available
 let authApp;
 try {
-    authApp = getApp('auth-app');
+    authApp = getApp();
 } catch {
-    authApp = initializeApp(firebaseConfig, 'auth-app');
+    authApp = initializeApp(firebaseConfig);
 }
 
 const auth = getAuth(authApp);

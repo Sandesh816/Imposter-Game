@@ -25,9 +25,9 @@ import { firebaseConfig } from "./firebase-config.js";
 // Re-use auth-app (shared Firebase app instance)
 let catApp;
 try {
-    catApp = getApp('auth-app');
+    catApp = getApp();
 } catch {
-    catApp = initializeApp(firebaseConfig, 'cat-app-' + Date.now());
+    catApp = initializeApp(firebaseConfig);
 }
 
 const db = getDatabase(catApp);

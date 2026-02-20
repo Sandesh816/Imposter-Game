@@ -2340,7 +2340,7 @@ function updateSaveCatBtn() {
     elements.publishCatBtn.disabled = !(hasName && hasWords);
 }
 
-function saveCustomCategory() {
+async function saveCustomCategory() {
     const name = elements.catNameInput.value.trim();
     if (!name || currentWords.length < 5) return;
 
@@ -2351,7 +2351,7 @@ function saveCustomCategory() {
         words: [...currentWords]
     };
 
-    const saved = CustomCat.saveLocalCategory(cat);
+    const saved = await CustomCat.saveLocalCategory(cat);
     editingCatId = saved.id;
     elements.publishCatBtn.disabled = false;
 
@@ -2372,7 +2372,7 @@ async function publishCustomCategory() {
         icon: getSelectedEmoji(),
         words: [...currentWords]
     };
-    const saved = CustomCat.saveLocalCategory(cat);
+    const saved = await CustomCat.saveLocalCategory(cat);
     editingCatId = saved.id;
 
     const authorName = elements.authorNameInput.value.trim() || 'Anonymous';
@@ -2610,11 +2610,6 @@ function initAuth() {
 
     // Single auth state listener: update UI
     Auth.onAuthChange(async user => {
-        updateAuthStrip(user);
-        if (user && user.displayName && elements.authorNameInput) {
-            elements.authorNameInput.placeholder = user.displayName;
-        }
-
         // Only run auto-guest logic here if we know there is NO pending redirect
         if (!user && !isRedirectPending) {
             const hasVisited = localStorage.getItem('imposter-has-visited');
@@ -2624,10 +2619,29 @@ function initAuth() {
                 try {
                     await Auth.signInAsGuest();
                     showScreen('welcome');
-                } catch (e) { console.warn('Guest sign-in failed:', e); }
+                } catch (e) {
+                    console.warn('Guest sign-in failed:', e);
+                    showScreen('onboarding');
+                }
             }
-        } else if (user && !isRedirectPending && document.querySelector('.screen.active')?.id === 'onboarding-screen') {
-            showScreen('welcome');
+            return;
+        }
+
+        if (user) {
+            // Fetch DB profile to ensure we have the most up to date display name, rather than stale cached user.displayName
+            const profile = await Auth.getProfile();
+            if (profile && profile.displayName) {
+                user.displayName = profile.displayName; // sync local object
+            }
+
+            updateAuthStrip(user);
+            if (user.displayName && elements.authorNameInput) {
+                elements.authorNameInput.placeholder = user.displayName;
+            }
+
+            if (!isRedirectPending && document.querySelector('.screen.active')?.id === 'onboarding-screen') {
+                showScreen('welcome');
+            }
         }
     });
 
