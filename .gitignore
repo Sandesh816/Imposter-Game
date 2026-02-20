@@ -21,9 +21,6 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# Firebase config (contains API keys)
-firebase-config.js
-
 # Logs
 *.log
 npm-debug.log*

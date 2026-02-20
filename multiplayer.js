@@ -15,8 +15,7 @@ import {
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-// Firebase configuration - loaded from gitignored config file
-// See firebase-config.example.js for the template
+// Firebase configuration
 import { firebaseConfig } from "./firebase-config.js";
 
 // Initialize Firebase

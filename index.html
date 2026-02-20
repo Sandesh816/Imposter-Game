@@ -22,6 +22,15 @@
     <!-- Screen 1: Welcome -->
     <section id="welcome-screen" class="screen active">
       <div class="container">
+
+        <!-- Auth Chip -->
+        <div class="auth-strip">
+          <button id="auth-avatar-btn" class="auth-avatar-btn" title="Account">
+            <span id="auth-avatar-emoji">👤</span>
+            <span id="auth-display-name" class="auth-display-name">Guest</span>
+          </button>
+        </div>
+
         <div class="logo-container">
           <div class="logo-icon">🕵️</div>
           <h1 class="logo-text">Secret Word</h1>
@@ -40,6 +49,17 @@
             <div class="mode-icon">🌐</div>
             <div class="mode-name">Multiplayer</div>
             <div class="mode-desc">Play online</div>
+          </button>
+        </div>
+
+        <div class="home-action-row">
+          <button id="league-btn" class="btn btn-league">
+            <span class="league-btn-icon">🏆</span>
+            <span>Leagues</span>
+          </button>
+          <button id="custom-cat-btn" class="btn btn-custom-cat">
+            <span class="league-btn-icon">🎨</span>
+            <span>My Categories</span>
           </button>
         </div>
 
@@ -86,6 +106,7 @@
               <button class="stepper-btn" id="imposter-minus">−</button>
               <span id="imposter-count">1</span>
               <button class="stepper-btn" id="imposter-plus">+</button>
+              <button class="stepper-btn stepper-randomize" id="imposter-randomize" title="Randomize">🎲</button>
             </div>
           </label>
         </div>
@@ -401,6 +422,7 @@
               <button class="stepper-btn" id="mp-imposter-minus">−</button>
               <span id="mp-imposter-count">1</span>
               <button class="stepper-btn" id="mp-imposter-plus">+</button>
+              <button class="stepper-btn stepper-randomize" id="mp-imposter-randomize" title="Randomize">🎲</button>
             </div>
           </label>
           <label class="setting-label">
@@ -688,30 +710,532 @@
     </div>
     <div id="chat-overlay" class="chat-overlay"></div>
 
-    <!-- Answer Reveal Modal (Local Mode) -->
+    <!-- Answer Reveal Modal (Local Mode) — Multi-step -->
     <div id="answer-modal" class="modal">
       <div class="modal-backdrop"></div>
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>🎭 The Answer</h3>
-        </div>
-        <div class="modal-body">
-          <div class="answer-section">
-            <p class="answer-label">The Secret Word was:</p>
-            <h2 class="answer-word" id="answer-word">WORD</h2>
+      <div class="modal-content modal-content-league">
+
+        <!-- Step 1: Vote — Who is the imposter? -->
+        <div id="modal-step-vote" class="modal-step">
+          <div class="modal-header">
+            <h3>🗳️ Who's the Imposter?</h3>
           </div>
-          <div class="answer-section">
-            <p class="answer-label">The Imposter(s):</p>
-            <div class="imposters-list" id="imposters-list">
-              <!-- Imposter names will be added here -->
+          <div class="modal-body">
+            <p class="modal-instruction">Tap the player(s) you think are the imposter(s), then confirm.</p>
+            <div class="vote-player-grid" id="modal-vote-grid">
+              <!-- Player cards for voting -->
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="modal-confirm-vote-btn" class="btn btn-primary" disabled>Confirm Vote</button>
+            <button id="modal-skip-vote-btn" class="btn btn-ghost">Skip (No Vote)</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Imposter Guess -->
+        <div id="modal-step-guess" class="modal-step hidden">
+          <div class="modal-header">
+            <h3>🕵️ Imposter's Guess</h3>
+          </div>
+          <div class="modal-body">
+            <p class="modal-instruction">Pass the phone to the imposter — can they guess the secret word?</p>
+            <div id="imposter-guess-area">
+              <!-- Dynamically filled with guess inputs per imposter -->
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="modal-submit-guess-btn" class="btn btn-primary">Submit Guess</button>
+            <button id="modal-skip-guess-btn" class="btn btn-ghost">Skip Guess</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Results + Points -->
+        <div id="modal-step-results" class="modal-step hidden">
+          <div class="modal-header">
+            <h3 id="modal-results-title">🎭 Results</h3>
+          </div>
+          <div class="modal-body">
+            <div class="answer-section">
+              <p class="answer-label">The Secret Word was:</p>
+              <h2 class="answer-word" id="answer-word">WORD</h2>
+            </div>
+            <div class="answer-section">
+              <p class="answer-label">The Imposter(s):</p>
+              <div class="imposters-list" id="imposters-list">
+                <!-- Imposter names -->
+              </div>
+            </div>
+            <div class="answer-section" id="guess-results-section">
+              <!-- Imposter guess results shown here -->
+            </div>
+            <div class="league-points-summary" id="league-points-summary">
+              <h4>🏆 Points This Round</h4>
+              <div id="points-list" class="points-list">
+                <!-- Points per player -->
+              </div>
+            </div>
+            <div class="league-selector" id="league-selector">
+              <h4>📋 Record to League(s)</h4>
+              <div id="league-checkbox-list" class="league-checkbox-list">
+                <!-- Checkboxes for each joined league -->
+              </div>
+              <p class="league-selector-hint" id="league-selector-hint">Join a league from the home screen to track
+                points.</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="save-points-btn" class="btn btn-primary">Save & Done</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- League Hub Screen -->
+    <section id="league-screen" class="screen">
+      <div class="container">
+        <div class="screen-header">
+          <button class="btn-back" id="league-back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2>🏆 Leagues</h2>
+          <div class="spacer"></div>
+        </div>
+
+        <div class="league-hub-actions">
+          <button id="create-league-btn" class="btn btn-primary btn-large">+ Create League</button>
+          <button id="join-league-btn" class="btn btn-secondary btn-large">🔗 Join League</button>
+        </div>
+
+        <div id="league-hub-list" class="league-hub-list">
+          <!-- League cards rendered dynamically -->
+        </div>
+        <div id="league-hub-empty" class="league-empty">
+          <p>No leagues yet!</p>
+          <p class="league-empty-sub">Create a league or join one with a code.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Create / Join League Screen -->
+    <section id="league-join-screen" class="screen">
+      <div class="container">
+        <div class="screen-header">
+          <button class="btn-back" id="league-join-back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2 id="league-join-title">Create League</h2>
+          <div class="spacer"></div>
+        </div>
+
+        <!-- Create Mode -->
+        <div id="league-create-form" class="league-form">
+          <label class="form-label">League Name</label>
+          <input type="text" id="league-name-input" class="form-input" placeholder="e.g. Friday Night Crew"
+            maxlength="30" autocomplete="off">
+          <button id="league-create-submit" class="btn btn-primary btn-large">Create League</button>
+        </div>
+
+        <!-- Join Mode -->
+        <div id="league-join-form" class="league-form hidden">
+          <label class="form-label">League Code</label>
+          <input type="text" id="league-code-input" class="form-input league-code-field" placeholder="ABC123"
+            maxlength="6" autocomplete="off">
+          <button id="league-join-submit" class="btn btn-primary btn-large">Join League</button>
+        </div>
+
+        <p id="league-form-error" class="form-error hidden"></p>
+      </div>
+    </section>
+
+    <!-- League Detail Screen -->
+    <section id="league-detail-screen" class="screen">
+      <div class="container">
+        <div class="screen-header">
+          <button class="btn-back" id="league-detail-back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2 id="league-detail-name">League</h2>
+          <div class="spacer"></div>
+        </div>
+
+        <div class="league-code-display">
+          <span class="league-code-label">Share this code</span>
+          <div class="league-code-box" id="league-code-box">
+            <span id="league-detail-code">ABC123</span>
+            <button class="btn-copy" id="league-copy-btn" title="Copy code">📋</button>
+          </div>
+        </div>
+
+        <div class="league-rules-card">
+          <h4>Scoring Rules</h4>
+          <ul class="league-rules-list">
+            <li><span class="rule-icon">👥</span> Civilians catch imposter → <strong>+1 pt</strong> each</li>
+            <li><span class="rule-icon">🕵️</span> Imposter survives → <strong>+1 pt</strong></li>
+            <li><span class="rule-icon">🎯</span> Imposter guesses word → <strong>+1 pt</strong></li>
+          </ul>
+        </div>
+
+        <div class="league-standings-table" id="league-detail-table">
+          <div class="league-empty" id="league-detail-empty">
+            <p>No games played yet!</p>
+            <p class="league-empty-sub">Play a game and record points to this league.</p>
+          </div>
+        </div>
+
+        <div class="league-detail-actions">
+          <button id="league-leave-btn" class="btn btn-ghost">Leave League</button>
+          <button id="league-delete-btn" class="btn btn-ghost btn-danger-text">Delete League</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== PROFILE SCREEN ===================== -->
+    <section id="profile-screen" class="screen">
+      <div class="container">
+        <div class="screen-header">
+          <button class="btn-back" id="profile-back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2>👤 Profile</h2>
+          <div class="spacer"></div>
+        </div>
+
+        <div class="profile-card">
+          <div class="profile-avatar-large" id="profile-avatar-large">👤</div>
+          <div id="profile-name-display" class="profile-name-display">Player</div>
+          <div id="profile-status-badge" class="profile-status-badge">Guest</div>
+        </div>
+
+        <div class="profile-actions">
+          <div class="form-group">
+            <label class="form-label">Display Name</label>
+            <div class="form-row">
+              <input type="text" id="profile-name-input" class="form-input" placeholder="Your name" maxlength="20">
+              <button id="profile-save-name-btn" class="btn btn-secondary btn-small">Save</button>
+            </div>
+          </div>
+
+          <div id="profile-upgrade-section">
+            <p class="profile-upgrade-hint">Sign in with Google to sync your data across devices.</p>
+            <button id="profile-google-btn" class="btn btn-google">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  fill="#4285F4" />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853" />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                  fill="#FBBC05" />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84z"
+                  fill="#EA4335" />
+              </svg>
+              <span>Link Google Account</span>
+            </button>
+          </div>
+
+          <div id="profile-stats" class="profile-stats hidden">
+            <div class="profile-stat">
+              <span class="profile-stat-value" id="stat-games">—</span>
+              <span class="profile-stat-label">Games</span>
+            </div>
+            <div class="profile-stat">
+              <span class="profile-stat-value" id="stat-wins">—</span>
+              <span class="profile-stat-label">Wins</span>
+            </div>
+            <div class="profile-stat">
+              <span class="profile-stat-value" id="stat-points">—</span>
+              <span class="profile-stat-label">Points</span>
             </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button id="close-modal-btn" class="btn btn-primary">Got it!</button>
+
+        <button id="profile-signout-btn" class="btn btn-ghost btn-danger-text" style="margin-top:auto">
+          Sign Out
+        </button>
+      </div>
+    </section>
+
+    <!-- ===================== CUSTOM CATEGORIES SCREENS ===================== -->
+
+    <!-- My Categories Hub -->
+    <section id="custom-cat-screen" class="screen">
+      <div class="container">
+        <div class="screen-header">
+          <button class="btn-back" id="custom-cat-back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2>🎨 My Categories</h2>
+          <div class="spacer"></div>
+        </div>
+
+        <div class="custom-cat-actions">
+          <button id="create-cat-btn" class="btn btn-primary btn-large">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span>Create Category</span>
+          </button>
+          <button id="browse-community-btn" class="btn btn-secondary btn-large">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <circle cx="12" cy="12" r="10" />
+              <path
+                d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+            </svg>
+            <span>Community Hub</span>
+          </button>
+        </div>
+
+        <div id="my-categories-list" class="my-categories-list"></div>
+        <div id="my-categories-empty" class="custom-cat-empty hidden">
+          <div class="empty-icon">📭</div>
+          <p>No custom categories yet.</p>
+          <p class="empty-hint">Create one or import from the Community Hub!</p>
         </div>
       </div>
+    </section>
+
+    <!-- Create / Edit Category -->
+    <section id="custom-create-screen" class="screen">
+      <div class="container">
+        <div class="screen-header">
+          <button class="btn-back" id="create-cat-back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2 id="create-cat-title">Create Category</h2>
+          <div class="spacer"></div>
+        </div>
+
+        <div class="form-container">
+          <div class="form-group">
+            <label class="form-label">Icon</label>
+            <div class="emoji-picker" id="emoji-picker">
+              <button class="emoji-option selected" data-emoji="📝">📝</button>
+              <button class="emoji-option" data-emoji="🎯">🎯</button>
+              <button class="emoji-option" data-emoji="🔥">🔥</button>
+              <button class="emoji-option" data-emoji="🌟">🌟</button>
+              <button class="emoji-option" data-emoji="💡">💡</button>
+              <button class="emoji-option" data-emoji="🎭">🎭</button>
+              <button class="emoji-option" data-emoji="🏆">🏆</button>
+              <button class="emoji-option" data-emoji="🎵">🎵</button>
+              <button class="emoji-option" data-emoji="🍕">🍕</button>
+              <button class="emoji-option" data-emoji="🚀">🚀</button>
+              <button class="emoji-option" data-emoji="🌍">🌍</button>
+              <button class="emoji-option" data-emoji="⚡">⚡</button>
+              <button class="emoji-option" data-emoji="🎮">🎮</button>
+              <button class="emoji-option" data-emoji="🦁">🦁</button>
+              <button class="emoji-option" data-emoji="💎">💎</button>
+              <button class="emoji-option" data-emoji="🌈">🌈</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Category Name</label>
+            <input type="text" id="cat-name-input" class="form-input" placeholder="e.g. Roman Emperors" maxlength="30">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Words <span id="word-count-badge" class="word-count-badge">0</span></label>
+            <div class="word-add-row">
+              <input type="text" id="word-input" class="form-input" placeholder="Type a word and press Add"
+                maxlength="40">
+              <button id="add-word-btn" class="btn btn-secondary btn-small">Add</button>
+            </div>
+            <div id="word-chip-list" class="word-chip-list"></div>
+            <p class="form-hint">Add at least 5 words. Aim for 20+.</p>
+          </div>
+
+          <div class="form-group publish-section">
+            <label class="form-label">Share with Community</label>
+            <div class="form-row">
+              <input type="text" id="author-name-input" class="form-input" placeholder="Your name (optional)"
+                maxlength="20">
+              <button id="publish-cat-btn" class="btn btn-secondary btn-small" disabled>Publish 🌐</button>
+            </div>
+            <p id="publish-status" class="publish-status hidden"></p>
+          </div>
+
+          <div id="create-cat-error" class="form-error hidden"></div>
+
+          <button id="save-cat-btn" class="btn btn-primary btn-large" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+              <polyline points="17 21 17 13 7 13 7 21" />
+              <polyline points="7 3 7 8 15 8" />
+            </svg>
+            <span>Save Category</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Community Hub -->
+    <section id="community-screen" class="screen">
+      <div class="container">
+        <div class="screen-header">
+          <button class="btn-back" id="community-back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2>🌐 Community</h2>
+          <div class="spacer"></div>
+        </div>
+
+        <div class="community-search-row">
+          <input type="text" id="community-search" class="form-input" placeholder="🔍 Search categories...">
+        </div>
+
+        <div id="community-loading" class="community-loading">
+          <div class="waiting-spinner"></div>
+          <span>Loading categories...</span>
+        </div>
+
+        <div id="community-list" class="community-list hidden"></div>
+
+        <div id="community-empty" class="custom-cat-empty hidden">
+          <div class="empty-icon">🌐</div>
+          <p>No community categories yet.</p>
+          <p class="empty-hint">Be the first to publish one!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Auth Modal Overlay -->
+    <div id="auth-modal" class="modal-overlay hidden">
+      <div class="modal-card auth-modal-card">
+        <h2 class="auth-modal-title">🕵️ Welcome!</h2>
+        <p class="auth-modal-sub">Choose how to play</p>
+
+        <div class="auth-modal-options">
+          <!-- Guest -->
+          <button id="auth-guest-btn" class="auth-option-btn auth-option-guest">
+            <span class="auth-option-icon">👤</span>
+            <div class="auth-option-text">
+              <div class="auth-option-name">Continue as Guest</div>
+              <div class="auth-option-desc">No account needed, data stays on this device</div>
+            </div>
+          </button>
+
+          <div class="auth-divider">or</div>
+
+          <!-- Log In -->
+          <button id="auth-login-btn" class="auth-option-btn auth-option-google">
+            <span class="auth-option-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  fill="#4285F4" />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853" />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                  fill="#FBBC05" />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  fill="#EA4335" />
+              </svg>
+            </span>
+            <div class="auth-option-text">
+              <div class="auth-option-name">Log In</div>
+              <div class="auth-option-desc">Sign into your existing Google account</div>
+            </div>
+          </button>
+
+          <!-- Sign Up -->
+          <button id="auth-signup-btn" class="auth-option-btn auth-option-google">
+            <span class="auth-option-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  fill="#4285F4" />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853" />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                  fill="#FBBC05" />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  fill="#EA4335" />
+              </svg>
+            </span>
+            <div class="auth-option-text">
+              <div class="auth-option-name">Create Account</div>
+              <div class="auth-option-desc">New here? Set up your Google account</div>
+            </div>
+          </button>
+        </div>
+
+        <p id="auth-modal-error" class="auth-modal-error hidden"></p>
+      </div>
     </div>
+
+    <!-- Profile Screen -->
+    <section id="profile-screen" class="screen">
+      <div class="container">
+        <button id="profile-back" class="back-btn">← Back</button>
+        <h2 class="section-title">My Account</h2>
+
+        <div class="profile-card">
+          <div class="profile-avatar-large" id="profile-avatar-large">👤</div>
+          <div class="profile-name-display" id="profile-name-display">Guest</div>
+          <div class="profile-status-badge" id="profile-status-badge">👤 Guest</div>
+        </div>
+
+        <div class="profile-actions">
+          <!-- Edit name -->
+          <div class="form-group">
+            <label class="form-label">Display Name</label>
+            <div style="display:flex;gap:8px">
+              <input type="text" id="profile-name-input" class="form-input" placeholder="Your name" maxlength="24">
+              <button id="profile-save-name-btn" class="btn btn-primary" style="white-space:nowrap">Save</button>
+            </div>
+          </div>
+
+          <!-- Upgrade section (shown for guests) -->
+          <div id="profile-upgrade-section">
+            <p class="profile-upgrade-hint">Link a Google account to sync your data across devices.</p>
+            <button id="profile-google-btn" class="btn-google">🔗 Link Google Account</button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="profile-stats hidden" id="profile-stats">
+          <div class="profile-stat">
+            <div class="profile-stat-value" id="stat-games">0</div>
+            <div class="profile-stat-label">Games</div>
+          </div>
+          <div class="profile-stat">
+            <div class="profile-stat-value" id="stat-wins">0</div>
+            <div class="profile-stat-label">Wins</div>
+          </div>
+          <div class="profile-stat">
+            <div class="profile-stat-value" id="stat-points">0</div>
+            <div class="profile-stat-label">Points</div>
+          </div>
+        </div>
+
+        <button id="profile-signout-btn" class="btn btn-ghost"
+          style="width:100%;margin-top:var(--spacing-xl);color:var(--danger)">Sign Out</button>
+      </div>
+    </section>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay hidden">

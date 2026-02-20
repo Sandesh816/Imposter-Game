@@ -1,0 +1,32 @@
+{
+    "rules": {
+        "users": {
+            "$uid": {
+                ".read": "$uid === auth.uid",
+                ".write": "$uid === auth.uid"
+            }
+        },
+        "leagues": {
+            "$code": {
+                ".read": "auth !== null",
+                ".write": "auth !== null",
+                "players": {
+                    "$uid": {
+                        ".write": "$uid === auth.uid || auth !== null"
+                    }
+                }
+            }
+        },
+        "communityCategories": {
+            ".read": "auth !== null",
+            "$catId": {
+                ".write": "auth !== null",
+                "upvotedBy": {
+                    "$uid": {
+                        ".write": "$uid === auth.uid"
+                    }
+                }
+            }
+        }
+    }
+}

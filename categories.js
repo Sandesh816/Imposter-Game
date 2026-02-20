@@ -250,6 +250,54 @@ const CATEGORIES = {
       "Mumbai Indians", "Chennai Super Kings", "Royal Challengers Bangalore", "Kolkata Knight Riders",
       "India Cricket Team", "Australia Cricket Team", "England Cricket Team", "New Zealand All Blacks"
     ]
+  },
+
+  scienceConcepts: {
+    name: "Science Concepts",
+    icon: "🔬",
+    words: [
+      "Thermodynamics", "Quantum Mechanics", "Electromagnetic Radiation", "Covalent Bond",
+      "Entropy", "Dark Matter", "Black Hole", "Nuclear Fission", "Nuclear Fusion",
+      "Superconductivity", "General Relativity", "Special Relativity", "Wave-Particle Duality",
+      "Heisenberg Uncertainty Principle", "Schrödinger Equation", "Planck Constant",
+      "Periodic Table", "Electronegativity", "Ionic Bond", "Hydrogen Bond",
+      "Oxidation Reduction", "Acid Base Reaction", "Chemical Equilibrium", "Le Chatelier Principle",
+      "Avogadro Number", "Molar Mass", "Stoichiometry", "Ideal Gas Law",
+      "Kinetic Energy", "Potential Energy", "Conservation of Energy", "Newton Laws of Motion",
+      "Centripetal Force", "Gravitational Waves", "Doppler Effect", "Refraction",
+      "Diffraction", "Interference", "Polarization", "Magnetic Field",
+      "Electric Field", "Ohm Law", "Faraday Law", "Coulomb Law",
+      "Kirchhoff Laws", "Capacitance", "Inductance", "Semiconductor",
+      "Photoelectric Effect", "Radioactive Decay", "Half Life", "Mass Spectrometry",
+      "Spectroscopy", "Chromatography", "Titration", "Buffer Solution",
+      "Catalyst", "Activation Energy", "Exothermic Reaction", "Endothermic Reaction",
+      "Plate Tectonics", "Seismic Waves", "Continental Drift", "Ozone Layer",
+      "Greenhouse Effect", "Hubble Law", "Neutron Star", "Supernova",
+      "Red Shift", "Cosmic Microwave Background"
+    ]
+  },
+
+  biologicalConcepts: {
+    name: "Biological Concepts",
+    icon: "🧬",
+    words: [
+      "Mitosis", "Meiosis", "Photosynthesis", "Cellular Respiration", "DNA Replication",
+      "Transcription", "Translation", "CRISPR", "Natural Selection", "Gene Expression",
+      "Enzyme Kinetics", "Krebs Cycle", "Glycolysis", "Electron Transport Chain",
+      "ATP Synthase", "Endoplasmic Reticulum", "Golgi Apparatus", "Ribosome",
+      "Mitochondria", "Chloroplast", "Cell Membrane", "Osmosis", "Active Transport",
+      "Diffusion", "Homeostasis", "Neurotransmitter", "Action Potential", "Synapse",
+      "Hardy Weinberg Equilibrium", "Genetic Drift", "Gene Flow", "Speciation",
+      "Phylogenetics", "Taxonomy", "Endosymbiosis", "Apoptosis", "Stem Cells",
+      "Antibody", "Antigen", "Immune Response", "Innate Immunity", "Adaptive Immunity",
+      "Vaccination", "Pathogen", "Antibiotic Resistance", "Biofilm",
+      "Nitrogen Cycle", "Carbon Cycle", "Ecological Succession", "Food Web",
+      "Trophic Level", "Carrying Capacity", "Biodiversity", "Keystone Species",
+      "Symbiosis", "Mutualism", "Parasitism", "Commensalism",
+      "Epigenetics", "Recombinant DNA", "Polymerase Chain Reaction", "Gel Electrophoresis",
+      "Western Blot", "Southern Blot", "Plasmid", "Restriction Enzyme",
+      "Allele Frequency", "Phenotype", "Genotype", "Mendelian Inheritance"
+    ]
   }
 };
 
