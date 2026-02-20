@@ -2246,10 +2246,28 @@ function renderMyCategoriesList() {
                 </div>
             </div>
             <div class="my-cat-actions">
+                ${!cat.communityId ? `<button class="btn btn-primary btn-small" data-publish="${cat.id}" title="Publish to Community Hub">⬆️</button>` : ''}
                 <button class="btn btn-ghost btn-small" data-edit="${cat.id}">Edit</button>
                 <button class="btn btn-ghost btn-small btn-danger-text" data-delete="${cat.id}">Delete</button>
             </div>
         `;
+        const publishBtn = card.querySelector('[data-publish]');
+        if (publishBtn) {
+            publishBtn.addEventListener('click', async () => {
+                publishBtn.disabled = true;
+                publishBtn.textContent = '⏳';
+                try {
+                    const authorName = elements.authorNameInput?.value?.trim() || 'Anonymous';
+                    await CustomCat.publishCategory(cat, authorName);
+                    renderMyCategoriesList();
+                    setTimeout(() => showCommunityHub(), 800);
+                } catch (e) {
+                    publishBtn.disabled = false;
+                    publishBtn.textContent = '❌';
+                    console.error("Publish failed", e);
+                }
+            });
+        }
         card.querySelector('[data-edit]').addEventListener('click', () => openEditCat(cat));
         card.querySelector('[data-delete]').addEventListener('click', () => deleteCustomCategory(cat.id));
         elements.myCategoriesList.appendChild(card);
