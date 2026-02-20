@@ -33,6 +33,7 @@ const gameState = {
 // DOM Elements
 // ===============================================
 const screens = {
+    onboarding: document.getElementById('onboarding-screen'),
     welcome: document.getElementById('welcome-screen'),
     players: document.getElementById('player-screen'),
     category: document.getElementById('category-screen'),
@@ -58,6 +59,11 @@ const screens = {
 };
 
 const elements = {
+    // Onboarding
+    landingLoginBtn: document.getElementById('landing-login-btn'),
+    landingSignupBtn: document.getElementById('landing-signup-btn'),
+    landingGuestBtn: document.getElementById('landing-guest-btn'),
+
     // Welcome / Mode Selection
     localModeBtn: document.getElementById('local-mode-btn'),
     multiplayerModeBtn: document.getElementById('multiplayer-mode-btn'),
@@ -2573,6 +2579,7 @@ function initAuth() {
         isRedirectPending = false;
         if (result && result.user) {
             updateAuthStrip(result.user);
+            showScreen('welcome');
             // If this is a brand new account, show profile screen so they can choose a name
             if (result.isNewUser) {
                 setTimeout(() => {
@@ -2586,10 +2593,14 @@ function initAuth() {
             if (!currentUser) {
                 const hasVisited = localStorage.getItem('imposter-has-visited');
                 if (!hasVisited) {
-                    showAuthModal();
+                    showScreen('onboarding');
                 } else {
-                    Auth.signInAsGuest().catch(e => console.warn(e));
+                    Auth.signInAsGuest().then(() => {
+                        showScreen('welcome');
+                    }).catch(e => console.warn(e));
                 }
+            } else {
+                showScreen('welcome');
             }
         }
     }).catch(e => {
@@ -2608,10 +2619,15 @@ function initAuth() {
         if (!user && !isRedirectPending) {
             const hasVisited = localStorage.getItem('imposter-has-visited');
             if (!hasVisited) {
-                showAuthModal();
+                showScreen('onboarding');
             } else {
-                try { await Auth.signInAsGuest(); } catch (e) { console.warn('Guest sign-in failed:', e); }
+                try {
+                    await Auth.signInAsGuest();
+                    showScreen('welcome');
+                } catch (e) { console.warn('Guest sign-in failed:', e); }
             }
+        } else if (user && !isRedirectPending && document.querySelector('.screen.active')?.id === 'onboarding-screen') {
+            showScreen('welcome');
         }
     });
 
@@ -2626,38 +2642,49 @@ function initAuth() {
         }
     });
 
-    // Auth modal — Guest button
-    elements.authGuestBtn.addEventListener('click', async () => {
-        hideAuthModal();
+    // Landing Page — Guest button
+    elements.landingGuestBtn.addEventListener('click', async () => {
         localStorage.setItem('imposter-has-visited', '1');
-        try { await Auth.signInAsGuest(); } catch (e) { console.warn('Guest sign-in failed:', e); }
-    });
-
-    // Auth modal — Log In button (both redirect to Google; Google decides new vs existing)
-    elements.authLoginBtn.addEventListener('click', async () => {
-        localStorage.setItem('imposter-has-visited', '1');
+        const originalText = elements.landingGuestBtn.querySelector('span').textContent;
         try {
-            elements.authLoginBtn.disabled = true;
-            elements.authLoginBtn.querySelector('.auth-option-name').textContent = 'Redirecting…';
-            await Auth.signInWithGoogle();
+            elements.landingGuestBtn.disabled = true;
+            elements.landingGuestBtn.querySelector('span').textContent = 'Connecting...';
+            await Auth.signInAsGuest();
+            showScreen('welcome');
         } catch (e) {
-            elements.authLoginBtn.disabled = false;
-            elements.authLoginBtn.querySelector('.auth-option-name').textContent = 'Log In';
-            showAuthModalError(e.message || 'Sign-in failed.');
+            console.warn('Guest sign-in failed:', e);
+            elements.landingGuestBtn.disabled = false;
+            elements.landingGuestBtn.querySelector('span').textContent = originalText;
         }
     });
 
-    // Auth modal — Sign Up button
-    elements.authSignupBtn.addEventListener('click', async () => {
+    // Landing Page — Log In button (both redirect to Google; Google decides new vs existing)
+    elements.landingLoginBtn.addEventListener('click', async () => {
         localStorage.setItem('imposter-has-visited', '1');
+        const originalText = elements.landingLoginBtn.querySelector('span').textContent;
         try {
-            elements.authSignupBtn.disabled = true;
-            elements.authSignupBtn.querySelector('.auth-option-name').textContent = 'Redirecting…';
+            elements.landingLoginBtn.disabled = true;
+            elements.landingLoginBtn.querySelector('span').textContent = 'Redirecting…';
             await Auth.signInWithGoogle();
         } catch (e) {
-            elements.authSignupBtn.disabled = false;
-            elements.authSignupBtn.querySelector('.auth-option-name').textContent = 'Create Account';
-            showAuthModalError(e.message || 'Sign-in failed.');
+            elements.landingLoginBtn.disabled = false;
+            elements.landingLoginBtn.querySelector('span').textContent = originalText;
+            console.error(e);
+        }
+    });
+
+    // Landing Page — Sign Up button
+    elements.landingSignupBtn.addEventListener('click', async () => {
+        localStorage.setItem('imposter-has-visited', '1');
+        const originalText = elements.landingSignupBtn.querySelector('span').textContent;
+        try {
+            elements.landingSignupBtn.disabled = true;
+            elements.landingSignupBtn.querySelector('span').textContent = 'Redirecting…';
+            await Auth.signInWithGoogle();
+        } catch (e) {
+            elements.landingSignupBtn.disabled = false;
+            elements.landingSignupBtn.querySelector('span').textContent = originalText;
+            console.error(e);
         }
     });
 
