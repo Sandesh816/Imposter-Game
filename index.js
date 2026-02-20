@@ -251,10 +251,8 @@ const elements = {
     resultsWord: document.getElementById('results-word'),
     resultsImposters: document.getElementById('results-imposters'),
     voteResults: document.getElementById('vote-results'),
-    resultsHostControls: document.getElementById('results-host-controls'),
     mpNewRoundBtn: document.getElementById('mp-new-round-btn'),
     mpReturnLobbyBtn: document.getElementById('mp-return-lobby-btn'),
-    resultsWaiting: document.getElementById('results-waiting'),
 
     // Chat
     chatSidebar: document.getElementById('chat-sidebar'),
