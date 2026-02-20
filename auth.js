@@ -198,6 +198,5 @@ export {
     ensureProfile,
     updateDisplayName,
     getProfile,
-    migrateLocalStorage,
-    handleRedirectResult
+    migrateLocalStorage
 };
