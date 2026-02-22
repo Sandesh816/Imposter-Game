@@ -5,6 +5,7 @@ import * as MP from './multiplayer.js';
 import * as League from './league.js';
 import * as CustomCat from './customCategories.js';
 import * as Auth from './auth.js';
+import * as AIGen from './aiGenerate.js';
 
 // ===============================================
 // Game State
@@ -292,6 +293,9 @@ const elements = {
     catNameInput: document.getElementById('cat-name-input'),
     wordInput: document.getElementById('word-input'),
     addWordBtn: document.getElementById('add-word-btn'),
+    aiGenerateBtn: document.getElementById('ai-generate-btn'),
+    aiGenerateMoreBtn: document.getElementById('ai-generate-more-btn'),
+    aiDifficultySelect: document.getElementById('ai-difficulty-select'),
     wordChipList: document.getElementById('word-chip-list'),
     wordCountBadge: document.getElementById('word-count-badge'),
     saveCatBtn: document.getElementById('save-cat-btn'),
@@ -2478,6 +2482,10 @@ function initEventListeners() {
     });
     elements.addWordBtn?.addEventListener('click', addWordChip);
 
+    // AI Generate
+    elements.aiGenerateBtn?.addEventListener('click', aiGenerateWords);
+    elements.aiGenerateMoreBtn?.addEventListener('click', aiGenerateMore);
+
     // Category name input — update save button state
     elements.catNameInput?.addEventListener('input', updateSaveCatBtn);
 
@@ -2608,6 +2616,75 @@ function addWordChip() {
     elements.wordInput.focus();
 }
 
+async function aiGenerateWords() {
+    const categoryName = elements.catNameInput?.value?.trim();
+    if (!categoryName) {
+        elements.createCatError.textContent = 'Enter a category name first (e.g. Countries, Roman Emperors)';
+        elements.createCatError.classList.remove('hidden');
+        elements.catNameInput?.focus();
+        return;
+    }
+    elements.createCatError.classList.add('hidden');
+
+    const difficulty = elements.aiDifficultySelect?.value || 'medium';
+    const btn = elements.aiGenerateBtn;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="ai-btn-icon">⏳</span><span>Generating...</span>';
+    }
+    if (elements.aiGenerateMoreBtn) elements.aiGenerateMoreBtn.disabled = true;
+    showLoading('Generating words with AI...');
+
+    try {
+        const words = await AIGen.generateWordsForCategory(categoryName, null, 20, difficulty, currentWords);
+        currentWords = [...new Set([...currentWords, ...words])];
+        renderWordChips();
+        updateSaveCatBtn();
+        if (elements.aiGenerateMoreBtn) elements.aiGenerateMoreBtn.classList.remove('hidden');
+    } catch (err) {
+        elements.createCatError.textContent = err.message || 'AI generation failed. Try again.';
+        elements.createCatError.classList.remove('hidden');
+    } finally {
+        hideLoading();
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="ai-btn-icon">✨</span><span>Generate with AI</span>';
+        }
+        if (elements.aiGenerateMoreBtn) elements.aiGenerateMoreBtn.disabled = false;
+    }
+}
+
+async function aiGenerateMore() {
+    const categoryName = elements.catNameInput?.value?.trim();
+    if (!categoryName) return;
+
+    const difficulty = elements.aiDifficultySelect?.value || 'medium';
+    const btn = elements.aiGenerateMoreBtn;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="ai-btn-icon">⏳</span><span>Generating...</span>';
+    }
+    if (elements.aiGenerateBtn) elements.aiGenerateBtn.disabled = true;
+    showLoading('Generating more words...');
+
+    try {
+        const words = await AIGen.generateWordsForCategory(categoryName, null, 10, difficulty, currentWords);
+        currentWords = [...new Set([...currentWords, ...words])];
+        renderWordChips();
+        updateSaveCatBtn();
+    } catch (err) {
+        elements.createCatError.textContent = err.message || 'AI generation failed. Try again.';
+        elements.createCatError.classList.remove('hidden');
+    } finally {
+        hideLoading();
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="ai-btn-icon">➕</span><span>Generate More</span>';
+        }
+        if (elements.aiGenerateBtn) elements.aiGenerateBtn.disabled = false;
+    }
+}
+
 function renderWordChips() {
     elements.wordChipList.innerHTML = '';
     elements.wordCountBadge.textContent = currentWords.length;
@@ -2656,37 +2733,66 @@ async function publishCustomCategory() {
     const name = elements.catNameInput.value.trim();
     if (!name || currentWords.length < 5) return;
 
-    // Save first if unsaved
-    const cat = {
-        id: editingCatId || undefined,
-        name,
-        icon: getSelectedEmoji(),
-        words: [...currentWords]
-    };
-    const saved = await CustomCat.saveLocalCategory(cat);
-    editingCatId = saved.id;
-
     const authorName = elements.authorNameInput.value.trim() || 'Anonymous';
     elements.publishCatBtn.disabled = true;
     elements.publishStatus.textContent = '⏳ Publishing...';
     elements.publishStatus.classList.remove('hidden');
 
     try {
+        if (!Auth.getCurrentUser()) {
+            await Auth.signInAsGuest();
+        }
+
+        const cat = {
+            id: editingCatId || undefined,
+            name,
+            icon: getSelectedEmoji(),
+            words: [...currentWords]
+        };
+        const saved = await CustomCat.saveLocalCategory(cat);
+        editingCatId = saved.id;
+
         await CustomCat.publishCategory(saved, authorName);
         elements.publishStatus.textContent = '✅ Published to Community Hub!';
         setTimeout(() => {
             showCommunityHub();
-        }, 1200);
+        }, 1500);
     } catch (e) {
-        elements.publishStatus.textContent = '❌ Failed to publish. Try again.';
+        console.error('[Publish] Failed:', e);
+        elements.publishStatus.textContent = `❌ ${e.message || 'Failed to publish. Try again.'}`;
         elements.publishCatBtn.disabled = false;
     }
 }
 
 function deleteCustomCategory(id) {
-    if (!confirm('Delete this category?')) return;
-    CustomCat.deleteLocalCategory(id);
-    renderMyCategoriesList();
+    showConfirm('Delete this category?', () => {
+        CustomCat.deleteLocalCategory(id);
+        renderMyCategoriesList();
+    });
+}
+
+let _confirmResolve = null;
+function showConfirm(message, onConfirm) {
+    const modal = document.getElementById('confirm-modal');
+    const msgEl = document.getElementById('confirm-message');
+    const okBtn = document.getElementById('confirm-ok-btn');
+    const cancelBtn = document.getElementById('confirm-cancel-btn');
+
+    msgEl.textContent = message;
+    modal.classList.remove('hidden');
+
+    const cleanup = () => {
+        modal.classList.add('hidden');
+        okBtn.replaceWith(okBtn.cloneNode(true));
+        cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+    };
+
+    document.getElementById('confirm-ok-btn').addEventListener('click', () => {
+        cleanup();
+        onConfirm();
+    });
+    document.getElementById('confirm-cancel-btn').addEventListener('click', cleanup);
+    document.querySelector('.confirm-backdrop').addEventListener('click', cleanup);
 }
 
 // ===============================================
@@ -2710,7 +2816,7 @@ async function showCommunityHub() {
     }
 }
 
-function renderCommunityList(cats) {
+async function renderCommunityList(cats) {
     elements.communityLoading.classList.add('hidden');
     elements.communityList.innerHTML = '';
 
@@ -2723,8 +2829,12 @@ function renderCommunityList(cats) {
     elements.communityEmpty.classList.add('hidden');
     elements.communityList.classList.remove('hidden');
 
-    cats.forEach(cat => {
-        const alreadyVoted = CustomCat.hasUpvoted(cat.id);
+    const upvoteStatuses = await Promise.all(
+        cats.map(cat => CustomCat.hasUpvoted(cat.id).catch(() => false))
+    );
+
+    cats.forEach((cat, i) => {
+        const alreadyVoted = upvoteStatuses[i];
         const card = document.createElement('div');
         card.className = 'community-card';
         card.dataset.communityId = cat.id;
@@ -2738,7 +2848,7 @@ function renderCommunityList(cats) {
             </div>
             <div class="community-card-footer">
                 <button class="btn-upvote ${alreadyVoted ? 'voted' : ''}" data-upvote="${cat.id}">
-                    ${alreadyVoted ? '👍' : '👍'} <span class="upvote-count">${cat.upvotes || 0}</span>
+                    👍 <span class="upvote-count">${cat.upvotes || 0}</span>
                 </button>
                 <button class="btn btn-secondary btn-small" data-import="${cat.id}">⬇️ Import</button>
             </div>
@@ -2747,13 +2857,21 @@ function renderCommunityList(cats) {
         const upvoteBtn = card.querySelector('[data-upvote]');
         upvoteBtn.addEventListener('click', async () => {
             if (upvoteBtn.classList.contains('voted')) return;
+            upvoteBtn.disabled = true;
             try {
+                if (!Auth.getCurrentUser()) {
+                    await Auth.signInAsGuest();
+                }
                 const result = await CustomCat.upvoteCategory(cat.id);
                 if (!result.alreadyVoted) {
                     upvoteBtn.classList.add('voted');
                     upvoteBtn.querySelector('.upvote-count').textContent = result.newCount;
                 }
-            } catch (e) { /* silent */ }
+            } catch (e) {
+                console.error('[Upvote] Failed:', e);
+            } finally {
+                upvoteBtn.disabled = false;
+            }
         });
 
         const importBtn = card.querySelector('[data-import]');
@@ -2939,20 +3057,8 @@ function initAuth() {
 
     // Single auth state listener: update UI
     Auth.onAuthChange(async user => {
-        // Only run auto-guest logic here if we know there's no auth yet
         if (!user) {
-            const hasVisited = localStorage.getItem('imposter-has-visited');
-            if (!hasVisited) {
-                showScreen('onboarding');
-            } else {
-                try {
-                    await Auth.signInAsGuest();
-                    showScreen('welcome');
-                } catch (e) {
-                    console.warn('Guest sign-in failed:', e);
-                    showScreen('onboarding');
-                }
-            }
+            showScreen('onboarding');
             return;
         }
 
@@ -2974,14 +3080,14 @@ function initAuth() {
         }
     });
 
-    // Auth chip (avatar) — opens profile if signed in, auth modal if guest
+    // Auth chip (avatar) — opens profile if signed in, onboarding if guest
     elements.authAvatarBtn?.addEventListener('click', () => {
         const user = Auth.getCurrentUser();
         if (user && !user.isAnonymous) {
             showScreen('profile');
             populateProfileScreen(user);
         } else {
-            showAuthModal();
+            showScreen('onboarding');
         }
     });
 
@@ -3029,8 +3135,7 @@ function initAuth() {
     // Profile — sign out
     elements.profileSignoutBtn.addEventListener('click', async () => {
         await Auth.signOut();
-        showScreen('welcome');
-        showAuthModal();
+        showScreen('onboarding');
     });
 }
 

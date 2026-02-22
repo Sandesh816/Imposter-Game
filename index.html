@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="Secret Word Imposter - A fun party game where players guess who the imposter is">
   <meta name="theme-color" content="#1a1a2e">
   <title>Secret Word Imposter</title>
@@ -21,7 +21,7 @@
 
     <!-- Screen 0: Onboarding / Landing Page -->
     <section id="onboarding-screen" class="screen active">
-      <div class="container" style="display: flex; flex-direction: column; justify-content: center; min-height: 80vh;">
+      <div class="container" style="display: flex; flex-direction: column; justify-content: center;">
         <div class="logo-container" style="margin-bottom: 2rem;">
           <div class="logo-icon blur-glow">🕵️</div>
           <h1 class="logo-text header-slide-in">Secret Word</h1>
@@ -534,7 +534,13 @@
 
     <!-- MP Screen 6: See Your Word -->
     <section id="mp-word-screen" class="screen">
-      <div class="container reveal-container">
+      <div class="container reveal-container relative-container">
+        <button id="mp-leave-game-word" class="btn-top-left">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h6v18h-6M10 17l5-5-5-5M15 12H3" />
+          </svg>
+          <span>Leave Room</span>
+        </button>
         <div class="screen-header">
           <div class="spacer"></div>
           <h2>Your Role</h2>
@@ -561,7 +567,7 @@
               <p class="word-label">Your question:</p>
               <p class="reveal-question-text" id="mp-question-text"></p>
               <input type="text" id="mp-answer-input" class="form-input" placeholder="Type your answer..." maxlength="100" autocomplete="off">
-              <button id="mp-submit-answer-btn" class="btn btn-primary" style="margin-top: 1rem;">Submit Answer</button>
+              <button type="button" id="mp-submit-answer-btn" class="btn btn-primary" style="margin-top: 1rem; position: relative; z-index: 10;">Submit Answer</button>
             </div>
             <p class="reveal-instruction" id="mp-reveal-instruction">Memorize it!</p>
           </div>
@@ -582,7 +588,13 @@
 
     <!-- MP Screen 7: Discussion -->
     <section id="mp-discussion-screen" class="screen">
-      <div class="container">
+      <div class="container relative-container">
+        <button id="mp-leave-game-discussion" class="btn-top-left">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h6v18h-6M10 17l5-5-5-5M15 12H3" />
+          </svg>
+          <span>Leave Room</span>
+        </button>
         <div class="game-header">
           <h2>Discussion Time!</h2>
           <p class="game-subtitle" id="mp-category-display">Category: Countries</p>
@@ -631,7 +643,13 @@
 
     <!-- MP Screen 8: Voting -->
     <section id="mp-voting-screen" class="screen">
-      <div class="container">
+      <div class="container relative-container">
+        <button id="mp-leave-game-voting" class="btn-top-left">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h6v18h-6M10 17l5-5-5-5M15 12H3" />
+          </svg>
+          <span>Leave Room</span>
+        </button>
         <div class="game-header">
           <h2>🗳️ Vote!</h2>
           <p class="game-subtitle">Who is the imposter?</p>
@@ -1136,6 +1154,21 @@
                 maxlength="40">
               <button id="add-word-btn" class="btn btn-secondary btn-small">Add</button>
             </div>
+            <div class="ai-generate-row">
+              <select id="ai-difficulty-select" class="ai-difficulty-select">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+              <button type="button" id="ai-generate-btn" class="btn btn-ghost btn-small">
+                <span class="ai-btn-icon">✨</span>
+                <span>Generate with AI</span>
+              </button>
+              <button type="button" id="ai-generate-more-btn" class="btn btn-ghost btn-small hidden">
+                <span class="ai-btn-icon">➕</span>
+                <span>Generate More</span>
+              </button>
+            </div>
             <div id="word-chip-list" class="word-chip-list"></div>
             <p class="form-hint">Add at least 5 words. Aim for 20+.</p>
           </div>
@@ -1247,6 +1280,18 @@
           style="width:100%;margin-top:var(--spacing-xl);color:var(--danger)">Sign Out</button>
       </div>
     </section>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="confirm-modal hidden">
+      <div class="confirm-backdrop"></div>
+      <div class="confirm-dialog">
+        <p id="confirm-message" class="confirm-message">Delete this category?</p>
+        <div class="confirm-actions">
+          <button id="confirm-cancel-btn" class="btn btn-secondary">Cancel</button>
+          <button id="confirm-ok-btn" class="btn btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay hidden">

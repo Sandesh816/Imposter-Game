@@ -1,0 +1,15 @@
+{
+  "appId": "com.secretword.imposter",
+  "appName": "Secret Word Imposter",
+  "webDir": "www",
+  "server": {
+    "url": "https://imposter-sandeshg.web.app",
+    "cleartext": true
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0f0a1e"
+    }
+  }
+}

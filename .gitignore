@@ -21,7 +21,13 @@ Thumbs.db
 .env.local
 .env.*.local
 firebase-config.js
+ai-config.js
 
+
+# Capacitor native projects
+android/
+ios/
+www/
 
 # Logs
 *.log

@@ -172,17 +172,30 @@ async function publishCategory(category, authorName = 'Anonymous') {
 }
 
 /**
- * Fetch all community categories. Uses simple get() to avoid query/index issues
- * that can cause empty results. Sorts client-side by upvotes, then publishedAt.
+ * Fetch all community categories via REST API to bypass SDK auth issues.
+ * Sorts by newest first.
  */
 async function fetchCommunityCategories() {
-    const snap = await get(ref(db, 'communityCategories'));
-    if (!snap.exists()) return [];
+    const dbUrl = 'https://imposter-sandeshg-default-rtdb.firebaseio.com';
 
-    const results = [];
-    snap.forEach(child => results.push({ id: child.key, ...child.val() }));
-    results.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) || (b.publishedAt || 0) - (a.publishedAt || 0));
-    return results.slice(0, 100);
+    try {
+        const res = await fetch(`${dbUrl}/communityCategories.json`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!data) return [];
+
+        const results = Object.entries(data).map(([id, val]) => ({ id, ...val }));
+        results.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+        return results.slice(0, 100);
+    } catch (err) {
+        console.error('[Community] REST fetch failed, trying SDK...', err);
+        const snap = await get(ref(db, 'communityCategories'));
+        if (!snap.exists()) return [];
+        const results = [];
+        snap.forEach(child => results.push({ id: child.key, ...child.val() }));
+        results.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+        return results.slice(0, 100);
+    }
 }
 
 /**

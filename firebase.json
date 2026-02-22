@@ -5,7 +5,17 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
-      "README.md"
+      "android/**",
+      "ios/**",
+      "www/**",
+      "resources/**",
+      "icons/**",
+      "package.json",
+      "package-lock.json",
+      "capacitor.config.json",
+      "testPublish.js",
+      "README.md",
+      "LICENSE"
     ],
     "headers": [
       {
