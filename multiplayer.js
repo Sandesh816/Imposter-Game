@@ -71,7 +71,7 @@ function shuffleArray(array) {
 // ===============================================
 // Room Management
 // ===============================================
-async function createRoom(playerName, imposterCount = 1) {
+async function createRoom(playerName, imposterCount = 1, gameType = 'word') {
     const roomCode = generateRoomCode();
     const playerId = generatePlayerId();
 
@@ -81,15 +81,17 @@ async function createRoom(playerName, imposterCount = 1) {
 
     if (snapshot.exists()) {
         // Extremely rare: code collision, try again
-        return createRoom(playerName, imposterCount);
+        return createRoom(playerName, imposterCount, gameType);
     }
 
     // Create the room
     const roomData = {
         host: playerId,
         status: 'lobby',
-        category: 'countries', // Default category
+        category: 'countries',
+        gameType: gameType || 'word',
         secretWord: null,
+        secretQuestion: null,
         imposterCount: imposterCount,
         anonymousVoting: false,
         lastCategory: null,
@@ -211,7 +213,7 @@ async function leaveRoom() {
 // ===============================================
 // Game Control (Host Only)
 // ===============================================
-async function startGame(category, secretWord, imposterCount = 1) {
+async function startGame(category, secretWord, imposterCount = 1, gameType = 'word', secretQuestion = null) {
     if (!multiplayerState.isHost) {
         throw new Error('Only the host can start the game.');
     }
@@ -244,12 +246,15 @@ async function startGame(category, secretWord, imposterCount = 1) {
         updates[`rooms/${roomCode}/players/${pid}/hasSeenWord`] = false;
         updates[`rooms/${roomCode}/players/${pid}/isReady`] = false;
         updates[`rooms/${roomCode}/players/${pid}/vote`] = null;
+        updates[`rooms/${roomCode}/players/${pid}/answer`] = null;
     });
 
     // Update room status
     updates[`rooms/${roomCode}/status`] = 'playing';
     updates[`rooms/${roomCode}/category`] = category;
-    updates[`rooms/${roomCode}/secretWord`] = secretWord;
+    updates[`rooms/${roomCode}/gameType`] = gameType || 'word';
+    updates[`rooms/${roomCode}/secretWord`] = gameType === 'word' ? secretWord : null;
+    updates[`rooms/${roomCode}/secretQuestion`] = gameType === 'question' ? secretQuestion : null;
 
     await update(ref(db), updates);
 }
@@ -305,6 +310,10 @@ async function newRound() {
         // updates[`rooms/${roomCode}/category`] = null; 
 
         updates[`rooms/${roomCode}/secretWord`] = null;
+        updates[`rooms/${roomCode}/secretQuestion`] = null;
+        Object.keys(players).forEach(pid => {
+            updates[`rooms/${roomCode}/players/${pid}/answer`] = null;
+        });
 
         await update(ref(db), updates);
     }
@@ -327,6 +336,16 @@ async function markWordSeen() {
 
     await update(ref(db, `rooms/${roomCode}/players/${playerId}`), {
         hasSeenWord: true
+    });
+}
+
+async function submitAnswer(answerText) {
+    const { roomCode, playerId } = multiplayerState;
+    if (!roomCode || !playerId) return;
+
+    await update(ref(db, `rooms/${roomCode}/players/${playerId}`), {
+        answer: (answerText || '').trim(),
+        hasSeenWord: true // Treat as "done" for question mode
     });
 }
 
@@ -532,14 +551,13 @@ async function setAnonymousVoting(isAnonymous) {
     await update(ref(db, `rooms/${roomCode}`), { anonymousVoting: isAnonymous });
 }
 
-async function playAgain(category, secretWord) {
+async function playAgain(category, secretWord, gameType = 'word', secretQuestion = null) {
     if (!multiplayerState.isHost) {
         throw new Error('Only the host can start a new game.');
     }
 
     const { roomCode } = multiplayerState;
 
-    // Reset player states and start game
     const playersRef = ref(db, `rooms/${roomCode}/players`);
     const snapshot = await get(playersRef);
 
@@ -550,24 +568,24 @@ async function playAgain(category, secretWord) {
         const imposterSnapshot = await get(imposterCountRef);
         const imposterCount = imposterSnapshot.exists() ? imposterSnapshot.val() : 1;
 
-        // Randomly select imposters
         const shuffledIds = shuffleArray(playerIds);
         const imposterIds = shuffledIds.slice(0, imposterCount);
 
         const updates = {};
 
-        // Reset all players
         Object.keys(players).forEach(pid => {
             updates[`rooms/${roomCode}/players/${pid}/isImposter`] = imposterIds.includes(pid);
             updates[`rooms/${roomCode}/players/${pid}/hasSeenWord`] = false;
             updates[`rooms/${roomCode}/players/${pid}/isReady`] = false;
             updates[`rooms/${roomCode}/players/${pid}/vote`] = null;
+            updates[`rooms/${roomCode}/players/${pid}/answer`] = null;
         });
 
-        // Set room to playing with new word
         updates[`rooms/${roomCode}/status`] = 'playing';
         updates[`rooms/${roomCode}/category`] = category;
-        updates[`rooms/${roomCode}/secretWord`] = secretWord;
+        updates[`rooms/${roomCode}/gameType`] = gameType || 'word';
+        updates[`rooms/${roomCode}/secretWord`] = gameType === 'word' ? secretWord : null;
+        updates[`rooms/${roomCode}/secretQuestion`] = gameType === 'question' ? secretQuestion : null;
         updates[`rooms/${roomCode}/lastCategory`] = category;
 
         await update(ref(db), updates);
@@ -608,6 +626,24 @@ async function setCategory(category) {
     await update(ref(db, `rooms/${roomCode}`), { category });
 }
 
+async function setGameType(gameType) {
+    if (!multiplayerState.isHost) {
+        throw new Error('Only the host can change game type.');
+    }
+    const { roomCode } = multiplayerState;
+    const roomRef = ref(db, `rooms/${roomCode}`);
+    const snap = await get(roomRef);
+    const updates = { gameType: gameType || 'word' };
+    // When switching to question, default category if current is word category
+    if (gameType === 'question' && snap.exists()) {
+        const cat = snap.val().category;
+        if (!cat || !cat.startsWith('q:')) {
+            updates.category = 'q:twistAndTurn';
+        }
+    }
+    await update(roomRef, updates);
+}
+
 // ===============================================
 // Export
 // ===============================================
@@ -621,6 +657,7 @@ export {
     newRound,
     returnToLobby,
     markWordSeen,
+    submitAnswer,
     markReady,
     castVote,
     updateImposterCount,
@@ -629,6 +666,7 @@ export {
     playAgain,
     resetForNewGame,
     setCategory,
+    setGameType,
     subscribeToRoom,
     subscribeToChat,
     sendChatMessage,

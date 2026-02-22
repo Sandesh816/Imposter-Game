@@ -30,14 +30,14 @@
 
         <div class="onboarding-actions slide-up"
           style="animation-delay: 0.5s; display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: 300px; margin: 0 auto;">
-          <button id="landing-login-btn" class="btn btn-primary btn-large">
+          <button type="button" id="landing-login-btn" class="btn btn-primary btn-large">
             <span>Log In</span>
           </button>
-          <button id="landing-signup-btn" class="btn btn-secondary btn-large">
+          <button type="button" id="landing-signup-btn" class="btn btn-secondary btn-large">
             <span>Create Account</span>
           </button>
           <div style="text-align: center; color: var(--text-muted); margin: 0.5rem 0; font-size: 0.9rem;">— or —</div>
-          <button id="landing-guest-btn" class="btn btn-ghost btn-large" style="background: rgba(255, 255, 255, 0.05);">
+          <button type="button" id="landing-guest-btn" class="btn btn-ghost btn-large" style="background: rgba(255, 255, 255, 0.05);">
             <span>Continue as Guest</span>
           </button>
         </div>
@@ -96,6 +96,34 @@
             <li>One player is the <strong>imposter</strong> with no word</li>
             <li>Discuss and vote to find the imposter!</li>
           </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen 1.5: Game Type Selection (Local) -->
+    <section id="game-type-screen" class="screen">
+      <div class="container">
+        <div class="screen-header">
+          <button class="btn-back" id="back-from-game-type">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2>Choose Game Mode</h2>
+          <div class="spacer"></div>
+        </div>
+        <p class="screen-subtitle" style="margin-bottom: 1.5rem; color: var(--text-muted);">Pick how you want to play</p>
+        <div class="mode-selection">
+          <button id="game-type-word-btn" class="mode-card">
+            <div class="mode-icon">📝</div>
+            <div class="mode-name">Secret Word</div>
+            <div class="mode-desc">Classic! Find who has no word</div>
+          </button>
+          <button id="game-type-question-btn" class="mode-card">
+            <div class="mode-icon">❓</div>
+            <div class="mode-name">Question Imposter</div>
+            <div class="mode-desc">Everyone answers a question. One got a different question—find them!</div>
+          </button>
         </div>
       </div>
     </section>
@@ -191,11 +219,16 @@
             </div>
           </div>
           <div class="reveal-back">
-            <div class="word-container">
+            <div id="reveal-word-container" class="word-container">
               <p class="word-label" id="word-label">Your word is:</p>
               <h2 class="secret-word" id="secret-word">SECRET WORD</h2>
             </div>
-            <p class="reveal-instruction">Memorize it, then tap to hide</p>
+            <div id="reveal-question-container" class="hidden">
+              <p class="word-label" id="reveal-question-label">Your question:</p>
+              <p class="reveal-question-text" id="reveal-question-text"></p>
+              <input type="text" id="reveal-answer-input" class="form-input" placeholder="Type your answer..." maxlength="100" autocomplete="off">
+            </div>
+            <p class="reveal-instruction" id="reveal-instruction">Memorize it, then tap to hide</p>
           </div>
         </div>
 
@@ -384,6 +417,13 @@
           </button>
         </div>
 
+        <div class="lobby-game-type-section" id="lobby-game-type-section">
+          <span class="category-label">Game Mode:</span>
+          <div class="lobby-game-type-btns">
+            <button id="lobby-game-type-word" class="btn btn-ghost btn-small lobby-game-type-btn active">Secret Word</button>
+            <button id="lobby-game-type-question" class="btn btn-ghost btn-small lobby-game-type-btn">Question Imposter</button>
+          </div>
+        </div>
         <div class="lobby-category-section">
           <div class="category-display-wrapper">
             <span class="category-label">Category:</span>
@@ -505,7 +545,7 @@
           <div class="reveal-front">
             <div class="player-avatar" id="mp-player-avatar">👤</div>
             <h3 class="player-name" id="mp-reveal-player-name">Your Name</h3>
-            <p class="reveal-instruction">Tap to reveal your word</p>
+            <p class="reveal-instruction" id="mp-reveal-front-instruction">Tap to reveal your word</p>
             <div class="tap-indicator">
               <div class="tap-circle"></div>
               <div class="tap-circle"></div>
@@ -513,19 +553,25 @@
             </div>
           </div>
           <div class="reveal-back">
-            <div class="word-container">
+            <div id="mp-word-container" class="word-container">
               <p class="word-label" id="mp-word-label">Your word is:</p>
               <h2 class="secret-word" id="mp-secret-word">SECRET WORD</h2>
             </div>
-            <p class="reveal-instruction">Memorize it!</p>
+            <div id="mp-question-container" class="hidden">
+              <p class="word-label">Your question:</p>
+              <p class="reveal-question-text" id="mp-question-text"></p>
+              <input type="text" id="mp-answer-input" class="form-input" placeholder="Type your answer..." maxlength="100" autocomplete="off">
+              <button id="mp-submit-answer-btn" class="btn btn-primary" style="margin-top: 1rem;">Submit Answer</button>
+            </div>
+            <p class="reveal-instruction" id="mp-reveal-instruction">Memorize it!</p>
           </div>
         </div>
 
-        <div class="mp-word-status">
+        <div class="mp-word-status" id="mp-word-status">
           <p id="mp-players-seen">0 of 0 players have seen their word</p>
         </div>
 
-        <button id="mp-ready-btn" class="btn btn-primary btn-large" disabled>
+        <button id="mp-ready-btn" class="btn btn-primary btn-large hidden">
           <span id="mp-ready-btn-text">Ready for Discussion</span>
           <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M5 12h14M12 5l7 7-7 7" />
@@ -540,6 +586,11 @@
         <div class="game-header">
           <h2>Discussion Time!</h2>
           <p class="game-subtitle" id="mp-category-display">Category: Countries</p>
+        </div>
+
+        <div id="mp-question-answers" class="modal-question-answers hidden" style="margin-bottom: 1.5rem;">
+          <p class="modal-question-prompt" id="mp-real-question"></p>
+          <div id="mp-answers-list" class="modal-answers-list"></div>
         </div>
 
         <div class="speaking-order" id="mp-speaking-order">
@@ -633,7 +684,7 @@
 
         <div class="results-card">
           <div class="results-section">
-            <p class="results-label">The Secret Word was:</p>
+            <p class="results-label" id="results-word-label">The Secret Word was:</p>
             <h3 class="results-word" id="results-word">WORD</h3>
           </div>
 
@@ -746,7 +797,11 @@
             <h3>🗳️ Who's the Imposter?</h3>
           </div>
           <div class="modal-body">
-            <p class="modal-instruction">Tap the player(s) you think are the imposter(s), then confirm.</p>
+            <div id="modal-question-answers" class="modal-question-answers hidden">
+              <p class="modal-question-prompt" id="modal-real-question"></p>
+              <div id="modal-answers-list" class="modal-answers-list"></div>
+            </div>
+            <p class="modal-instruction" id="modal-vote-instruction">Tap the player(s) you think are the imposter(s), then confirm.</p>
             <div class="vote-player-grid" id="modal-vote-grid">
               <!-- Player cards for voting -->
             </div>
@@ -780,8 +835,8 @@
             <h3 id="modal-results-title">🎭 Results</h3>
           </div>
           <div class="modal-body">
-            <div class="answer-section">
-              <p class="answer-label">The Secret Word was:</p>
+            <div class="answer-section" id="modal-answer-section">
+              <p class="answer-label" id="modal-answer-label">The Secret Word was:</p>
               <h2 class="answer-word" id="answer-word">WORD</h2>
             </div>
             <div class="answer-section">
@@ -1201,6 +1256,7 @@
   </div>
 
   <script src="categories.js"></script>
+  <script src="questionCategories.js"></script>
   <script src="index.js" type="module"></script>
 </body>
 

@@ -11,11 +11,14 @@ import * as Auth from './auth.js';
 // ===============================================
 const gameState = {
     mode: 'local', // 'local' or 'multiplayer'
+    gameType: 'word', // 'word' or 'question'
     // Local mode state
     players: [],
     imposterCount: 1,
     selectedCategory: null,
     secretWord: null,
+    secretQuestion: null, // { real, imposter } for question mode
+    playerAnswers: [], // [playerIndex -> answer] for question mode
     imposterIndices: [],
     currentRevealIndex: 0,
     isRevealed: false,
@@ -35,6 +38,7 @@ const gameState = {
 const screens = {
     onboarding: document.getElementById('onboarding-screen'),
     welcome: document.getElementById('welcome-screen'),
+    gameType: document.getElementById('game-type-screen'),
     players: document.getElementById('player-screen'),
     category: document.getElementById('category-screen'),
     reveal: document.getElementById('reveal-screen'),
@@ -94,6 +98,11 @@ const elements = {
     totalPlayers: document.getElementById('total-players'),
     nextPlayerBtn: document.getElementById('next-player-btn'),
     nextPlayerText: document.getElementById('next-player-text'),
+    revealWordContainer: document.getElementById('reveal-word-container'),
+    revealQuestionContainer: document.getElementById('reveal-question-container'),
+    revealQuestionText: document.getElementById('reveal-question-text'),
+    revealAnswerInput: document.getElementById('reveal-answer-input'),
+    revealInstruction: document.getElementById('reveal-instruction'),
 
     // Game (Local)
     gameCategory: document.getElementById('game-category'),
@@ -110,6 +119,9 @@ const elements = {
     modalStepVote: document.getElementById('modal-step-vote'),
     modalStepGuess: document.getElementById('modal-step-guess'),
     modalStepResults: document.getElementById('modal-step-results'),
+    modalQuestionAnswers: document.getElementById('modal-question-answers'),
+    modalRealQuestion: document.getElementById('modal-real-question'),
+    modalAnswersList: document.getElementById('modal-answers-list'),
     modalVoteGrid: document.getElementById('modal-vote-grid'),
     modalConfirmVoteBtn: document.getElementById('modal-confirm-vote-btn'),
     modalSkipVoteBtn: document.getElementById('modal-skip-vote-btn'),
@@ -472,8 +484,8 @@ function renderPlayerList() {
 }
 
 function updatePlayerCount() {
-    elements.playerCount.textContent = gameState.players.length;
-    elements.continueToCategory.disabled = gameState.players.length < 3;
+    if (elements.playerCount) elements.playerCount.textContent = gameState.players.length;
+    if (elements.continueToCategory) elements.continueToCategory.disabled = gameState.players.length < 3;
 }
 
 function updateImposterLimits() {
@@ -481,11 +493,11 @@ function updateImposterLimits() {
 
     if (gameState.imposterCount > maxImposters) {
         gameState.imposterCount = maxImposters;
-        elements.imposterCount.textContent = gameState.imposterCount;
+        if (elements.imposterCount) elements.imposterCount.textContent = gameState.imposterCount;
     }
 
-    elements.imposterMinus.disabled = gameState.imposterCount <= 1;
-    elements.imposterPlus.disabled = gameState.imposterCount >= maxImposters;
+    if (elements.imposterMinus) elements.imposterMinus.disabled = gameState.imposterCount <= 1;
+    if (elements.imposterPlus) elements.imposterPlus.disabled = gameState.imposterCount >= maxImposters;
 }
 
 function updateMPImposterLimits(playerCount) {
@@ -507,10 +519,30 @@ function updateMPImposterLimits(playerCount) {
 // ===============================================
 // LOCAL MODE - Category Management
 // ===============================================
-function renderCategories(targetGrid = elements.categoryGrid, callback = selectCategory) {
+function renderCategories(targetGrid = elements.categoryGrid, callback = selectCategory, gameTypeOverride = null) {
     targetGrid.innerHTML = '';
+    const gType = gameTypeOverride ?? gameState.gameType;
 
-    // Prepend custom categories
+    if (gType === 'question') {
+        // Question mode: only question categories
+        if (typeof QUESTION_CATEGORIES !== 'undefined') {
+            Object.entries(QUESTION_CATEGORIES).forEach(([key, category]) => {
+                const card = document.createElement('div');
+                card.className = 'category-card';
+                card.dataset.category = 'q:' + key;
+                card.innerHTML = `
+          <div class="category-icon">${category.icon}</div>
+          <div class="category-name">${category.name}</div>
+          <div class="category-count">${category.questions?.length || 0} questions</div>
+        `;
+                card.addEventListener('click', () => callback('q:' + key));
+                targetGrid.appendChild(card);
+            });
+        }
+        return;
+    }
+
+    // Word mode: custom + built-in word categories
     const localCats = CustomCat.getLocalCategoriesSync();
     localCats.forEach(cat => {
         const card = document.createElement('div');
@@ -527,18 +559,15 @@ function renderCategories(targetGrid = elements.categoryGrid, callback = selectC
         targetGrid.appendChild(card);
     });
 
-    // Built-in categories
     Object.entries(CATEGORIES).forEach(([key, category]) => {
         const card = document.createElement('div');
         card.className = 'category-card';
         card.dataset.category = key;
-
         card.innerHTML = `
       <div class="category-icon">${category.icon}</div>
       <div class="category-name">${category.name}</div>
       <div class="category-count">${category.words.length} words</div>
     `;
-
         card.addEventListener('click', () => callback(key));
         targetGrid.appendChild(card);
     });
@@ -546,6 +575,14 @@ function renderCategories(targetGrid = elements.categoryGrid, callback = selectC
 
 function selectCategory(categoryKey) {
     gameState.selectedCategory = categoryKey;
+    if (gameState.gameType === 'question' && categoryKey.startsWith('q:')) {
+        const qKey = categoryKey.slice(2);
+        const pair = getRandomQuestion(qKey);
+        if (pair) {
+            gameState.secretQuestion = pair;
+            gameState.playerAnswers = new Array(gameState.players.length).fill(null);
+        }
+    }
     startLocalGame();
 }
 
@@ -553,7 +590,17 @@ function selectCategory(categoryKey) {
 // LOCAL MODE - Game Logic
 // ===============================================
 function startLocalGame() {
-    gameState.secretWord = getRandomWord(gameState.selectedCategory);
+    if (gameState.gameType === 'word') {
+        gameState.secretWord = getRandomWord(gameState.selectedCategory);
+        gameState.secretQuestion = null;
+        gameState.playerAnswers = [];
+    } else if (gameState.gameType === 'question' && gameState.selectedCategory?.startsWith('q:')) {
+        const pair = getRandomQuestion(gameState.selectedCategory.slice(2));
+        if (pair) {
+            gameState.secretQuestion = pair;
+            gameState.playerAnswers = new Array(gameState.players.length).fill(null);
+        }
+    }
 
     const playerIndices = gameState.players.map((_, index) => index);
     const shuffledIndices = shuffleArray(playerIndices);
@@ -577,14 +624,29 @@ function updateRevealScreen() {
     elements.playerAvatar.textContent = avatars[gameState.currentRevealIndex % avatars.length];
     elements.revealPlayerName.textContent = currentPlayer;
 
-    if (isImposter) {
-        elements.wordLabel.textContent = "You are the:";
-        elements.secretWord.textContent = "IMPOSTER! 🕵️";
-        elements.secretWord.classList.add('imposter');
+    if (gameState.gameType === 'question') {
+        elements.revealWordContainer?.classList.add('hidden');
+        elements.revealQuestionContainer?.classList.remove('hidden');
+        elements.revealInstruction?.classList.add('hidden');
+        const q = isImposter ? gameState.secretQuestion.imposter : gameState.secretQuestion.real;
+        elements.revealQuestionText.textContent = q;
+        elements.revealAnswerInput.value = gameState.playerAnswers[gameState.currentRevealIndex] || '';
+        elements.revealAnswerInput.placeholder = 'Type your answer...';
+        elements.nextPlayerBtn.disabled = true;
     } else {
-        elements.wordLabel.textContent = "Your word is:";
-        elements.secretWord.textContent = gameState.secretWord;
-        elements.secretWord.classList.remove('imposter');
+        elements.revealWordContainer?.classList.remove('hidden');
+        elements.revealQuestionContainer?.classList.add('hidden');
+        elements.revealInstruction?.classList.remove('hidden');
+        if (isImposter) {
+            elements.wordLabel.textContent = "You are the:";
+            elements.secretWord.textContent = "IMPOSTER! 🕵️";
+            elements.secretWord.classList.add('imposter');
+        } else {
+            elements.wordLabel.textContent = "Your word is:";
+            elements.secretWord.textContent = gameState.secretWord;
+            elements.secretWord.classList.remove('imposter');
+        }
+        elements.nextPlayerBtn.disabled = false;
     }
 
     elements.currentPlayerNum.textContent = gameState.currentRevealIndex + 1;
@@ -598,13 +660,23 @@ function updateRevealScreen() {
 }
 
 function toggleReveal() {
+    // In question mode, once revealed stay revealed (they need to type answer)
+    if (gameState.gameType === 'question' && gameState.isRevealed) return;
     gameState.isRevealed = !gameState.isRevealed;
     elements.revealCard.classList.toggle('revealed', gameState.isRevealed);
+    if (gameState.gameType === 'question' && gameState.isRevealed) {
+        setTimeout(() => elements.revealAnswerInput?.focus(), 300);
+    }
 }
 
 function nextPlayer() {
-    if (!gameState.isRevealed) {
-        return;
+    if (!gameState.isRevealed) return;
+
+    // Question mode: save answer before advancing
+    if (gameState.gameType === 'question') {
+        const ans = elements.revealAnswerInput?.value?.trim();
+        if (!ans) return;
+        gameState.playerAnswers[gameState.currentRevealIndex] = ans;
     }
 
     elements.revealCard.classList.remove('revealed');
@@ -675,6 +747,32 @@ function revealAnswer() {
     elements.modalStepResults.classList.add('hidden');
     elements.modalConfirmVoteBtn.disabled = true;
 
+    // Question mode: show real question + all answers
+    if (gameState.gameType === 'question' && gameState.secretQuestion) {
+        elements.modalQuestionAnswers?.classList.remove('hidden');
+        elements.modalRealQuestion.textContent = gameState.secretQuestion.real;
+        elements.modalAnswersList.innerHTML = '';
+        const avatars = getPlayerAvatars();
+        gameState.players.forEach((player, idx) => {
+            const item = document.createElement('div');
+            item.className = 'modal-answer-item';
+            const ans = gameState.playerAnswers[idx] || '(no answer)';
+            const playerSpan = document.createElement('span');
+            playerSpan.className = 'answer-player';
+            playerSpan.textContent = `${avatars[idx % avatars.length]} ${player}`;
+            const ansSpan = document.createElement('span');
+            ansSpan.className = 'answer-text';
+            ansSpan.textContent = `"${ans}"`;
+            item.appendChild(playerSpan);
+            item.appendChild(ansSpan);
+            elements.modalAnswersList.appendChild(item);
+        });
+        document.getElementById('modal-vote-instruction').textContent = 'One person got a different question. Whose answer seems off? Vote below.';
+    } else {
+        elements.modalQuestionAnswers?.classList.add('hidden');
+        document.getElementById('modal-vote-instruction').textContent = 'Tap the player(s) you think are the imposter(s), then confirm.';
+    }
+
     // Build vote grid
     elements.modalVoteGrid.innerHTML = '';
     const avatars = getPlayerAvatars();
@@ -703,7 +801,13 @@ function revealAnswer() {
 }
 
 function modalConfirmVote() {
-    // Move to step 2: imposter guess
+    // Question mode: skip imposter guess (no secret word to guess)
+    if (gameState.gameType === 'question') {
+        imposterGuesses = {};
+        finalizeLeaguePoints();
+        return;
+    }
+    // Word mode: move to step 2 imposter guess
     showModalStep('guess');
 
     elements.imposterGuessArea.innerHTML = '';
@@ -718,7 +822,6 @@ function modalConfirmVote() {
         elements.imposterGuessArea.appendChild(wrapper);
     });
 
-    // Focus first input
     const firstInput = elements.imposterGuessArea.querySelector('.guess-input');
     if (firstInput) setTimeout(() => firstInput.focus(), 200);
 }
@@ -806,8 +909,18 @@ function finalizeLeaguePoints() {
         elements.modalResultsTitle.textContent = '🎉 Crew Wins!';
     }
 
-    // Secret word
-    elements.answerWord.textContent = gameState.secretWord;
+    // Secret word or question
+    if (gameState.gameType === 'question') {
+        document.getElementById('modal-answer-label').textContent = 'The question was:';
+        elements.answerWord.textContent = gameState.secretQuestion?.real || '(unknown)';
+        elements.answerWord.style.fontSize = '1rem';
+        elements.answerWord.style.fontWeight = '500';
+    } else {
+        document.getElementById('modal-answer-label').textContent = 'The Secret Word was:';
+        elements.answerWord.textContent = gameState.secretWord;
+        elements.answerWord.style.fontSize = '';
+        elements.answerWord.style.fontWeight = '';
+    }
 
     // Imposters list
     elements.impostersList.innerHTML = '';
@@ -1324,8 +1437,29 @@ function updateLobbyUI(data, isHost, players, playerCount) {
     // Show/hide controls based on host status and game state
     // Update category display
     const categoryKey = data.category || 'countries';
-    const categoryName = CATEGORIES[categoryKey]?.name || 'Countries';
+    const gameType = data.gameType || 'word';
+    let categoryName = 'Countries';
+    if (gameType === 'question' && categoryKey.startsWith('q:')) {
+        const qKey = categoryKey.slice(2);
+        categoryName = QUESTION_CATEGORIES?.[qKey]?.name || qKey;
+    } else {
+        categoryName = CATEGORIES[categoryKey]?.name || 'Countries';
+    }
     elements.lobbyCategoryValue.textContent = categoryName;
+
+    // Update game type buttons (host can change, others see current)
+    const lobbyGameTypeWord = document.getElementById('lobby-game-type-word');
+    const lobbyGameTypeQuestion = document.getElementById('lobby-game-type-question');
+    if (lobbyGameTypeWord) {
+        lobbyGameTypeWord.classList.toggle('active', gameType === 'word');
+        lobbyGameTypeWord.onclick = () => isHost && MP.setGameType('word');
+        lobbyGameTypeWord.disabled = !isHost;
+    }
+    if (lobbyGameTypeQuestion) {
+        lobbyGameTypeQuestion.classList.toggle('active', gameType === 'question');
+        lobbyGameTypeQuestion.onclick = () => isHost && MP.setGameType('question');
+        lobbyGameTypeQuestion.disabled = !isHost;
+    }
 
     if (isHost) {
         elements.lobbyChangeCategoryBtn.classList.remove('hidden');
@@ -1398,31 +1532,57 @@ function updateWordScreen(data) {
     const avatars = getPlayerAvatars();
     const playerIds = Object.keys(data.players);
     const myIndex = playerIds.indexOf(gameState.myPlayerId);
+    const gameType = data.gameType || 'word';
 
     elements.mpPlayerAvatar.textContent = avatars[myIndex % avatars.length];
     elements.mpRevealPlayerName.textContent = myPlayer.name;
 
-    // Reset card state
     elements.mpRevealCard.classList.remove('revealed');
     gameState.mpRevealed = false;
 
-    // Reset ready button for new round
-    elements.mpReadyBtn.classList.remove('btn-ready-confirmed');
-    elements.mpReadyBtnText.textContent = 'Ready for Discussion';
-    elements.mpReadyBtn.disabled = true; // Will be enabled when word is seen
+    const mpWordContainer = document.getElementById('mp-word-container');
+    const mpQuestionContainer = document.getElementById('mp-question-container');
+    const mpReadyBtn = document.getElementById('mp-ready-btn');
+    const mpWordStatus = document.getElementById('mp-word-status');
 
-    if (myPlayer.isImposter) {
-        elements.mpWordLabel.textContent = "You are the:";
-        elements.mpSecretWord.textContent = "IMPOSTER! 🕵️";
-        elements.mpSecretWord.classList.add('imposter');
+    if (gameType === 'question' && data.secretQuestion) {
+        mpWordContainer?.classList.add('hidden');
+        mpQuestionContainer?.classList.remove('hidden');
+        document.getElementById('mp-reveal-front-instruction').textContent = 'Tap to see your question';
+        document.getElementById('mp-reveal-instruction')?.classList.add('hidden');
+        const q = myPlayer.isImposter ? data.secretQuestion.imposter : data.secretQuestion.real;
+        document.getElementById('mp-question-text').textContent = q;
+        document.getElementById('mp-answer-input').value = myPlayer.answer || '';
+        mpReadyBtn?.classList.add('hidden');
+        mpWordStatus?.classList.add('hidden');
     } else {
-        elements.mpWordLabel.textContent = "Your word is:";
-        elements.mpSecretWord.textContent = data.secretWord;
-        elements.mpSecretWord.classList.remove('imposter');
+        mpWordContainer?.classList.remove('hidden');
+        mpQuestionContainer?.classList.add('hidden');
+        const frontInst = document.getElementById('mp-reveal-front-instruction');
+        if (frontInst) frontInst.textContent = 'Tap to reveal your word';
+        document.getElementById('mp-reveal-instruction')?.classList.remove('hidden');
+        elements.mpReadyBtn.classList.remove('btn-ready-confirmed');
+        elements.mpReadyBtnText.textContent = 'Ready for Discussion';
+        elements.mpReadyBtn.disabled = true;
+        mpReadyBtn?.classList.remove('hidden');
+        mpWordStatus?.classList.remove('hidden');
+
+        if (myPlayer.isImposter) {
+            elements.mpWordLabel.textContent = "You are the:";
+            elements.mpSecretWord.textContent = "IMPOSTER! 🕵️";
+            elements.mpSecretWord.classList.add('imposter');
+        } else {
+            elements.mpWordLabel.textContent = "Your word is:";
+            elements.mpSecretWord.textContent = data.secretWord;
+            elements.mpSecretWord.classList.remove('imposter');
+        }
     }
 }
 
 function updateWordScreenStatus(data) {
+    const gameType = data.gameType || 'word';
+    if (gameType === 'question') return; // Handled by submit button
+
     const players = data.players;
     const total = Object.keys(players).length;
     const seen = Object.values(players).filter(p => p.hasSeenWord).length;
@@ -1435,12 +1595,16 @@ function updateWordScreenStatus(data) {
 }
 
 function toggleMPReveal() {
+    const gameType = gameState.roomData?.gameType || 'word';
+    if (gameType === 'question') {
+        gameState.mpRevealed = true;
+        elements.mpRevealCard.classList.add('revealed');
+        document.getElementById('mp-answer-input')?.focus();
+        return;
+    }
     gameState.mpRevealed = !gameState.mpRevealed;
     elements.mpRevealCard.classList.toggle('revealed', gameState.mpRevealed);
-
-    if (gameState.mpRevealed) {
-        MP.markWordSeen();
-    }
+    if (gameState.mpRevealed) MP.markWordSeen();
 }
 
 async function markReady() {
@@ -1452,11 +1616,14 @@ async function markReady() {
 }
 
 function checkAllReady(data) {
+    const gameType = data.gameType || 'word';
     const players = Object.values(data.players);
-    const allReady = players.every(p => p.isReady);
+
+    const allReady = gameType === 'question'
+        ? players.every(p => p.hasSeenWord && p.answer) // All submitted answers
+        : players.every(p => p.isReady);
 
     if (allReady && players.length >= 3) {
-        // Transition to discussion
         updateDiscussionScreen(data);
         showScreen('mpDiscussion');
     }
@@ -1466,8 +1633,50 @@ function checkAllReady(data) {
 // MULTIPLAYER MODE - Discussion Screen
 // ===============================================
 function updateDiscussionScreen(data) {
-    const category = CATEGORIES[data.category];
-    elements.mpCategoryDisplay.textContent = `Category: ${category.name}`;
+    const gameType = data.gameType || 'word';
+    const categoryKey = data.category || 'countries';
+
+    let categoryName = 'Countries';
+    if (gameType === 'question' && categoryKey.startsWith('q:')) {
+        const qKey = categoryKey.slice(2);
+        categoryName = QUESTION_CATEGORIES?.[qKey]?.name || qKey;
+    } else {
+        categoryName = CATEGORIES[categoryKey]?.name || 'Countries';
+    }
+    elements.mpCategoryDisplay.textContent = `Category: ${categoryName}`;
+
+    // Question mode: show real question + all answers
+    const mpQuestionAnswers = document.getElementById('mp-question-answers');
+    const mpRealQuestion = document.getElementById('mp-real-question');
+    const mpAnswersList = document.getElementById('mp-answers-list');
+    const mpSpeakingOrder = document.getElementById('mp-speaking-order');
+
+    if (gameType === 'question' && data.secretQuestion) {
+        mpQuestionAnswers?.classList.remove('hidden');
+        mpRealQuestion.textContent = data.secretQuestion.real;
+        mpAnswersList.innerHTML = '';
+        const avatars = getPlayerAvatars();
+        let idx = 0;
+        Object.entries(data.players).forEach(([pid, player]) => {
+            const item = document.createElement('div');
+            item.className = 'modal-answer-item';
+            const ans = player.answer || '(no answer)';
+            const playerSpan = document.createElement('span');
+            playerSpan.className = 'answer-player';
+            playerSpan.textContent = `${avatars[idx % avatars.length]} ${player.name}`;
+            const ansSpan = document.createElement('span');
+            ansSpan.className = 'answer-text';
+            ansSpan.textContent = `"${ans}"`;
+            item.appendChild(playerSpan);
+            item.appendChild(ansSpan);
+            mpAnswersList.appendChild(item);
+            idx++;
+        });
+        mpSpeakingOrder?.classList.add('hidden');
+    } else {
+        mpQuestionAnswers?.classList.add('hidden');
+        mpSpeakingOrder?.classList.remove('hidden');
+    }
 
     // Render players
     elements.mpDiscussionPlayers.innerHTML = '';
@@ -1706,8 +1915,16 @@ function updateResultsScreen(data) {
         elements.resultsSubtitle.textContent = 'The imposter was caught!';
     }
 
-    // Show secret word
-    elements.resultsWord.textContent = data.secretWord;
+    // Show secret word or question
+    const gameType = data.gameType || 'word';
+    const resultsWordLabel = document.getElementById('results-word-label');
+    if (gameType === 'question' && data.secretQuestion) {
+        elements.resultsWord.textContent = data.secretQuestion.real;
+        if (resultsWordLabel) resultsWordLabel.textContent = 'The question was:';
+    } else {
+        elements.resultsWord.textContent = data.secretWord;
+        if (resultsWordLabel) resultsWordLabel.textContent = 'The Secret Word was:';
+    }
 
     // Show imposters
     elements.resultsImposters.innerHTML = '';
@@ -1746,7 +1963,13 @@ function updateResultsScreen(data) {
 
     // Category
     const categoryKey = data.category || 'countries';
-    const categoryName = CATEGORIES[categoryKey]?.name || 'Countries';
+    const gameTypeRes = data.gameType || 'word';
+    let categoryName = 'Countries';
+    if (gameTypeRes === 'question' && categoryKey.startsWith('q:')) {
+        categoryName = QUESTION_CATEGORIES?.[categoryKey.slice(2)]?.name || categoryKey;
+    } else {
+        categoryName = CATEGORIES[categoryKey]?.name || 'Countries';
+    }
     elements.resultsCategoryValue.textContent = categoryName;
 
     // Players List (Similar to Lobby)
@@ -1807,13 +2030,20 @@ function updateResultsScreen(data) {
 }
 
 async function mpNewRound() {
-    const category = gameState.roomData.category || 'countries';
-    const secretWord = getRandomWord(category); // Re-roll word
-    const imposterCount = gameState.roomData.imposterCount || 1; // Use setting
+    const gameType = gameState.roomData?.gameType || 'word';
+    let category = gameState.roomData?.category || 'countries';
+    if (gameType === 'question' && !category.startsWith('q:')) category = 'q:personalLife';
+    const imposterCount = gameState.roomData?.imposterCount || 1;
 
     showLoading('Starting new round...');
     try {
-        await MP.startGame(category, secretWord, imposterCount);
+        if (gameType === 'question') {
+            const qKey = category.startsWith('q:') ? category.slice(2) : 'twistAndTurn';
+            const secretQuestion = getRandomQuestion(qKey);
+            await MP.startGame(category, null, imposterCount, 'question', secretQuestion);
+        } else {
+            await MP.startGame(category, getRandomWord(category), imposterCount);
+        }
         hideLoading();
     } catch (err) {
         hideLoading();
@@ -1893,12 +2123,7 @@ function initEventListeners() {
     // Mode Selection
     elements.localModeBtn?.addEventListener('click', () => {
         gameState.mode = 'local';
-        if (gameState.players.length === 0) {
-            for (let i = 0; i < 4; i++) {
-                addPlayer();
-            }
-        }
-        showScreen('players');
+        showScreen('gameType');
     });
 
     elements.multiplayerModeBtn?.addEventListener('click', () => {
@@ -1906,8 +2131,25 @@ function initEventListeners() {
         showScreen('mpChoice');
     });
 
+    // Game Type Selection
+    document.getElementById('back-from-game-type')?.addEventListener('click', () => showScreen('welcome'));
+    document.getElementById('game-type-word-btn')?.addEventListener('click', () => {
+        gameState.gameType = 'word';
+        if (gameState.players.length === 0) {
+            for (let i = 0; i < 4; i++) addPlayer();
+        }
+        showScreen('players');
+    });
+    document.getElementById('game-type-question-btn')?.addEventListener('click', () => {
+        gameState.gameType = 'question';
+        if (gameState.players.length === 0) {
+            for (let i = 0; i < 4; i++) addPlayer();
+        }
+        showScreen('players');
+    });
+
     // Local Mode - Player screen
-    elements.backToWelcome?.addEventListener('click', () => showScreen('welcome'));
+    elements.backToWelcome?.addEventListener('click', () => showScreen('gameType'));
     elements.addPlayerBtn?.addEventListener('click', () => addPlayer());
 
     elements.imposterMinus?.addEventListener('click', () => {
@@ -1947,6 +2189,11 @@ function initEventListeners() {
     elements.backToCategory?.addEventListener('click', () => showScreen('category'));
     elements.revealCard?.addEventListener('click', toggleReveal);
     elements.nextPlayerBtn?.addEventListener('click', nextPlayer);
+    elements.revealAnswerInput?.addEventListener('input', () => {
+        if (gameState.gameType === 'question') {
+            elements.nextPlayerBtn.disabled = !elements.revealAnswerInput.value.trim();
+        }
+    });
 
     // Local Mode - Game screen
     elements.revealAnswerBtn?.addEventListener('click', revealAnswer);
@@ -2034,11 +2281,21 @@ function initEventListeners() {
 
     // Start Game (First Time)
     elements.mpStartGameBtn?.addEventListener('click', async () => {
-        const category = gameState.roomData.category || 'countries';
-        const secretWord = getRandomWord(category);
+        const gameType = gameState.roomData?.gameType || 'word';
+        let category = gameState.roomData.category || 'countries';
+        if (gameType === 'question' && !category.startsWith('q:')) {
+            category = 'q:personalLife'; // Default question category
+        }
         showLoading('Starting game...');
         try {
-            await MP.startGame(category, secretWord, gameState.mpImposterCount);
+            if (gameType === 'question') {
+                const qKey = category.startsWith('q:') ? category.slice(2) : 'twistAndTurn';
+                const secretQuestion = getRandomQuestion(qKey);
+                await MP.startGame(category, null, gameState.mpImposterCount, 'question', secretQuestion);
+            } else {
+                const secretWord = getRandomWord(category);
+                await MP.startGame(category, secretWord, gameState.mpImposterCount);
+            }
             hideLoading();
         } catch (err) {
             hideLoading();
@@ -2048,17 +2305,25 @@ function initEventListeners() {
 
     // Category Selection logic handled by selectMPCategory and lobby button
     elements.lobbyChangeCategoryBtn?.addEventListener('click', () => {
-        renderCategories(elements.mpCategoryGrid, selectMPCategory);
+        const gameType = gameState.roomData?.gameType || 'word';
+        renderCategories(elements.mpCategoryGrid, selectMPCategory, gameType);
         showScreen('mpCategory');
     });
 
     // Post-game "Play" button (Restart)
     elements.mpPlayAgainBtn?.addEventListener('click', async () => {
-        const category = gameState.roomData?.category || 'countries';
-        const secretWord = getRandomWord(category);
+        const gameType = gameState.roomData?.gameType || 'word';
+        let category = gameState.roomData?.category || 'countries';
+        if (gameType === 'question' && !category.startsWith('q:')) category = 'q:personalLife';
         showLoading('Starting new game...');
         try {
-            await MP.playAgain(category, secretWord);
+            if (gameType === 'question') {
+                const qKey = category.startsWith('q:') ? category.slice(2) : 'twistAndTurn';
+                const secretQuestion = getRandomQuestion(qKey);
+                await MP.playAgain(category, null, 'question', secretQuestion);
+            } else {
+                await MP.playAgain(category, getRandomWord(category));
+            }
             hideLoading();
         } catch (err) {
             hideLoading();
@@ -2082,6 +2347,16 @@ function initEventListeners() {
     // Multiplayer - Word
     elements.mpRevealCard?.addEventListener('click', toggleMPReveal);
     elements.mpReadyBtn?.addEventListener('click', markReady);
+    document.getElementById('mp-submit-answer-btn')?.addEventListener('click', async () => {
+        const input = document.getElementById('mp-answer-input');
+        const ans = input?.value?.trim();
+        if (!ans) return;
+        try {
+            await MP.submitAnswer(ans);
+        } catch (e) {
+            console.error('Submit answer failed', e);
+        }
+    });
 
     // Multiplayer - Discussion
     elements.mpStartVotingBtn?.addEventListener('click', startVoting);
@@ -2111,7 +2386,7 @@ function initEventListeners() {
                 hideLoading();
                 // Do not change screen, just update data (which triggers updateResultsScreen)
             });
-        });
+        }, gameType);
         showScreen('mpCategory'); // This goes to category screen.
         // Wait, if we go to category screen, how do we come BACK to Results?
         // Using mpBackToLobby? no.
@@ -2584,10 +2859,80 @@ async function populateProfileScreen(user) {
 // Initialize
 // ===============================================
 function init() {
-    initEventListeners();
-    updatePlayerCount();
-    updateImposterLimits();
+    // Attach landing button listeners FIRST (before anything that might throw)
+    attachLandingListeners();
+
+    try {
+        initEventListeners();
+        updatePlayerCount();
+        updateImposterLimits();
+    } catch (e) {
+        console.error('Init error:', e);
+    }
     initAuth();
+}
+
+function attachLandingListeners() {
+    const guestBtn = document.getElementById('landing-guest-btn');
+    const loginBtn = document.getElementById('landing-login-btn');
+    const signupBtn = document.getElementById('landing-signup-btn');
+
+    if (guestBtn) {
+        guestBtn.addEventListener('click', async () => {
+            localStorage.setItem('imposter-has-visited', '1');
+            const originalText = guestBtn.querySelector('span')?.textContent;
+            try {
+                guestBtn.disabled = true;
+                if (guestBtn.querySelector('span')) guestBtn.querySelector('span').textContent = 'Connecting...';
+                await Auth.signInAsGuest();
+                showScreen('welcome');
+            } catch (e) {
+                console.warn('Guest sign-in failed:', e);
+                guestBtn.disabled = false;
+                if (guestBtn.querySelector('span')) guestBtn.querySelector('span').textContent = originalText || 'Continue as Guest';
+            }
+        });
+    }
+
+    if (loginBtn) {
+        loginBtn.addEventListener('click', async () => {
+            localStorage.setItem('imposter-has-visited', '1');
+            const originalText = loginBtn.querySelector('span')?.textContent;
+            try {
+                loginBtn.disabled = true;
+                if (loginBtn.querySelector('span')) loginBtn.querySelector('span').textContent = 'Connecting...';
+                const result = await Auth.signInWithGoogle();
+                if (result?.user) {
+                    showScreen(result.isNewUser ? 'profile' : 'welcome');
+                    if (result.isNewUser) populateProfileScreen(result.user);
+                }
+            } catch (e) {
+                loginBtn.disabled = false;
+                if (loginBtn.querySelector('span')) loginBtn.querySelector('span').textContent = originalText || 'Log In';
+                console.error(e);
+            }
+        });
+    }
+
+    if (signupBtn) {
+        signupBtn.addEventListener('click', async () => {
+            localStorage.setItem('imposter-has-visited', '1');
+            const originalText = signupBtn.querySelector('span')?.textContent;
+            try {
+                signupBtn.disabled = true;
+                if (signupBtn.querySelector('span')) signupBtn.querySelector('span').textContent = 'Connecting...';
+                const result = await Auth.signInWithGoogle();
+                if (result?.user) {
+                    showScreen(result.isNewUser ? 'profile' : 'welcome');
+                    if (result.isNewUser) populateProfileScreen(result.user);
+                }
+            } catch (e) {
+                signupBtn.disabled = false;
+                if (signupBtn.querySelector('span')) signupBtn.querySelector('span').textContent = originalText || 'Create Account';
+                console.error(e);
+            }
+        });
+    }
 }
 
 function initAuth() {
@@ -2630,7 +2975,7 @@ function initAuth() {
     });
 
     // Auth chip (avatar) — opens profile if signed in, auth modal if guest
-    elements.authAvatarBtn.addEventListener('click', () => {
+    elements.authAvatarBtn?.addEventListener('click', () => {
         const user = Auth.getCurrentUser();
         if (user && !user.isAnonymous) {
             showScreen('profile');
@@ -2640,67 +2985,7 @@ function initAuth() {
         }
     });
 
-    // Landing Page — Guest button
-    elements.landingGuestBtn.addEventListener('click', async () => {
-        localStorage.setItem('imposter-has-visited', '1');
-        const originalText = elements.landingGuestBtn.querySelector('span').textContent;
-        try {
-            elements.landingGuestBtn.disabled = true;
-            elements.landingGuestBtn.querySelector('span').textContent = 'Connecting...';
-            await Auth.signInAsGuest();
-            showScreen('welcome');
-        } catch (e) {
-            console.warn('Guest sign-in failed:', e);
-            elements.landingGuestBtn.disabled = false;
-            elements.landingGuestBtn.querySelector('span').textContent = originalText;
-        }
-    });
-
-    // Landing Page — Log In button (both redirect to Google; Google decides new vs existing)
-    elements.landingLoginBtn.addEventListener('click', async () => {
-        localStorage.setItem('imposter-has-visited', '1');
-        const originalText = elements.landingLoginBtn.querySelector('span').textContent;
-        try {
-            elements.landingLoginBtn.disabled = true;
-            elements.landingLoginBtn.querySelector('span').textContent = 'Connecting...';
-            const result = await Auth.signInWithGoogle();
-            if (result && result.user) {
-                if (result.isNewUser) {
-                    showScreen('profile');
-                    populateProfileScreen(result.user);
-                } else {
-                    showScreen('welcome');
-                }
-            }
-        } catch (e) {
-            elements.landingLoginBtn.disabled = false;
-            elements.landingLoginBtn.querySelector('span').textContent = originalText;
-            console.error(e);
-        }
-    });
-
-    // Landing Page — Sign Up button
-    elements.landingSignupBtn.addEventListener('click', async () => {
-        localStorage.setItem('imposter-has-visited', '1');
-        const originalText = elements.landingSignupBtn.querySelector('span').textContent;
-        try {
-            elements.landingSignupBtn.disabled = true;
-            elements.landingSignupBtn.querySelector('span').textContent = 'Connecting...';
-            const result = await Auth.signInWithGoogle();
-            if (result && result.user) {
-                if (result.isNewUser) {
-                    showScreen('profile');
-                    populateProfileScreen(result.user);
-                } else {
-                    showScreen('welcome');
-                }
-            }
-        } catch (e) {
-            elements.landingSignupBtn.disabled = false;
-            elements.landingSignupBtn.querySelector('span').textContent = originalText;
-            console.error(e);
-        }
-    });
+    // Landing buttons are attached in attachLandingListeners() (called first in init)
 
     // Profile — back button
     elements.profileBack.addEventListener('click', () => showScreen('welcome'));

@@ -13,10 +13,7 @@ import {
     get,
     update,
     remove,
-    push,
-    query,
-    orderByChild,
-    limitToLast
+    push
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
@@ -175,21 +172,17 @@ async function publishCategory(category, authorName = 'Anonymous') {
 }
 
 /**
- * Fetch the top community categories sorted by upvotes.
+ * Fetch all community categories. Uses simple get() to avoid query/index issues
+ * that can cause empty results. Sorts client-side by upvotes, then publishedAt.
  */
 async function fetchCommunityCategories() {
-    const q = query(
-        ref(db, 'communityCategories'),
-        orderByChild('upvotes'),
-        limitToLast(50)
-    );
-    const snap = await get(q);
+    const snap = await get(ref(db, 'communityCategories'));
     if (!snap.exists()) return [];
 
     const results = [];
     snap.forEach(child => results.push({ id: child.key, ...child.val() }));
-    results.sort((a, b) => b.upvotes - a.upvotes || b.publishedAt - a.publishedAt);
-    return results;
+    results.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0) || (b.publishedAt || 0) - (a.publishedAt || 0));
+    return results.slice(0, 100);
 }
 
 /**

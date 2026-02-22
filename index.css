@@ -175,12 +175,23 @@ body {
   transition: all var(--transition-slow);
   z-index: 1;
   overflow-y: auto;
+  pointer-events: none; /* Inactive screens must not block clicks */
 }
 
 .screen.active {
   opacity: 1;
   visibility: visible;
   transform: translateX(0);
+  pointer-events: auto; /* Active screen receives clicks */
+  z-index: 2; /* Ensure active screen is always on top */
+}
+
+/* Onboarding landing buttons - ensure clickable */
+#onboarding-screen .btn {
+  cursor: pointer;
+  touch-action: manipulation;
+  position: relative;
+  z-index: 1;
 }
 
 .container {
@@ -2334,6 +2345,71 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: var(--spacing-sm);
+}
+
+/* Lobby game type selector */
+.lobby-game-type-section {
+  margin-bottom: var(--spacing-md);
+}
+.lobby-game-type-btns {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+}
+.lobby-game-type-btn.active {
+  background: var(--accent-glow);
+  border-color: var(--accent-primary);
+}
+.lobby-game-type-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* Question Imposter - Modal answers display */
+.modal-question-answers {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+.modal-question-prompt {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+}
+.modal-answers-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+.modal-answer-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-md);
+}
+.modal-answer-item .answer-player {
+  font-weight: 600;
+  min-width: 80px;
+}
+.modal-answer-item .answer-text {
+  color: var(--text-secondary);
+}
+
+/* Question Imposter - Reveal screen */
+.reveal-question-text {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: var(--spacing-md) 0;
+  line-height: 1.4;
+}
+#reveal-answer-input {
+  margin-top: var(--spacing-md);
+  width: 100%;
 }
 
 .vote-player-card {
