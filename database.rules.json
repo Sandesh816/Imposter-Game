@@ -6,6 +6,10 @@
                 ".write": "$uid === auth.uid"
             }
         },
+        "rooms": {
+            ".read": "auth !== null",
+            ".write": "auth !== null"
+        },
         "leagues": {
             "$code": {
                 ".read": "auth !== null",
