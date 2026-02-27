@@ -59,10 +59,16 @@ function generatePlayerId() {
     return 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+function cryptoRandom() {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return arr[0] / (0xFFFFFFFF + 1);
+}
+
 function shuffleArray(array) {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = Math.floor(cryptoRandom() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     return shuffled;
@@ -274,6 +280,38 @@ async function showResults() {
     }
 
     const { roomCode } = multiplayerState;
+
+    const playersRef = ref(db, `rooms/${roomCode}/players`);
+    const snapshot = await get(playersRef);
+    if (!snapshot.exists()) {
+        await update(ref(db, `rooms/${roomCode}`), { status: 'results' });
+        return;
+    }
+
+    const players = snapshot.val();
+    const results = calculateVoteResults(players);
+    const imposterIdSet = new Set(results.imposterIds);
+
+    const pointsMap = {};
+    Object.keys(players).forEach(pid => {
+        pointsMap[pid] = 0;
+    });
+
+    const correctVote = results.imposterIds.length > 0 && results.eliminated && imposterIdSet.has(results.eliminated) && !results.tie;
+
+    if (correctVote) {
+        Object.keys(players).forEach(pid => {
+            if (!imposterIdSet.has(pid)) {
+                pointsMap[pid] = 1;
+            }
+        });
+    } else if (results.imposterWins) {
+        results.imposterIds.forEach(pid => {
+            pointsMap[pid] = 1;
+        });
+    }
+
+    await addRoomPoints(pointsMap);
     await update(ref(db, `rooms/${roomCode}`), { status: 'results' });
 }
 
@@ -618,6 +656,23 @@ async function resetForNewGame() {
     }
 }
 
+async function addRoomPoints(pointsMap) {
+    const { roomCode } = multiplayerState;
+    if (!roomCode) return;
+
+    const scoresRef = ref(db, `rooms/${roomCode}/scores`);
+    const snapshot = await get(scoresRef);
+    const currentScores = snapshot.exists() ? snapshot.val() : {};
+
+    const updates = {};
+    Object.entries(pointsMap).forEach(([pid, points]) => {
+        const current = currentScores[pid] || 0;
+        updates[`rooms/${roomCode}/scores/${pid}`] = current + points;
+    });
+
+    await update(ref(db), updates);
+}
+
 async function setCategory(category) {
     if (!multiplayerState.isHost) {
         throw new Error('Only the host can set the category.');
@@ -667,6 +722,7 @@ export {
     resetForNewGame,
     setCategory,
     setGameType,
+    addRoomPoints,
     subscribeToRoom,
     subscribeToChat,
     sendChatMessage,

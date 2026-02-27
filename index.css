@@ -1613,6 +1613,74 @@ body {
   border: 1px solid var(--danger);
 }
 
+/* Room Leaderboard */
+.room-leaderboard {
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(234, 179, 8, 0.05) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: var(--radius-lg);
+}
+
+.leaderboard-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: var(--spacing-xs);
+  color: #fbbf24;
+  text-align: center;
+}
+
+.leaderboard-rules {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.room-leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.room-leaderboard-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+}
+
+.room-leaderboard-row.top-1 {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.room-leaderboard-row .leaderboard-rank {
+  font-weight: 700;
+  min-width: 24px;
+  color: var(--text-muted);
+}
+
+.room-leaderboard-row.top-1 .leaderboard-rank {
+  color: #fbbf24;
+}
+
+.room-leaderboard-row .leaderboard-name {
+  flex: 1;
+  font-weight: 500;
+  margin-left: var(--spacing-sm);
+}
+
+.room-leaderboard-row .leaderboard-points {
+  font-weight: 700;
+  color: #fbbf24;
+  min-width: 36px;
+  text-align: right;
+}
+
 /* Chat Styles */
 .chat-toggle-btn {
   position: fixed;
@@ -3004,6 +3072,156 @@ body {
   justify-content: center;
   gap: var(--spacing-md);
   padding-bottom: var(--spacing-xl);
+}
+
+.league-play-action {
+  margin: var(--spacing-lg) 0;
+  text-align: center;
+}
+
+.league-play-action .btn {
+  width: 100%;
+  font-size: 1.1rem;
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+/* ============================
+   League Play Screen
+   ============================ */
+.league-play-subtitle {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin-bottom: var(--spacing-lg);
+}
+
+/* ============================
+   League Player Select Screen
+   ============================ */
+.league-players-hint {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.league-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.league-member-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.league-member-item:hover {
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.league-member-item.selected {
+  border-color: var(--accent-primary);
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.league-member-item .member-checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  font-size: 0.8rem;
+}
+
+.league-member-item.selected .member-checkbox {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
+.league-member-item .member-name {
+  font-size: 1rem;
+  font-weight: 500;
+  flex: 1;
+}
+
+.league-member-item .member-stats {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.league-member-item .member-badge {
+  font-size: 0.75rem;
+  color: var(--accent-primary);
+  background: rgba(139, 92, 246, 0.1);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.league-add-player-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.league-add-player-row .form-input {
+  flex: 1;
+}
+
+.league-players-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding-bottom: var(--spacing-lg);
+}
+
+.league-player-count {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.league-players-footer .imposter-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.league-players-footer .imposter-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-right: var(--spacing-xs);
+}
+
+.league-players-footer .btn {
+  width: 100%;
+  max-width: 320px;
+}
+
+.league-auto-save-label {
+  text-align: center;
+  color: var(--accent-primary);
+  font-weight: 500;
+  font-size: 0.95rem;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(139, 92, 246, 0.08);
+  border-radius: var(--radius-md);
+  margin-top: var(--spacing-md);
 }
 
 /* ============================

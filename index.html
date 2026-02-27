@@ -264,9 +264,14 @@
           </div>
         </div>
 
-        <div class="speaking-order">
+        <div class="speaking-order" id="local-speaking-order">
           <h3>🎤 First Speaker</h3>
           <p id="first-speaker">Loading...</p>
+        </div>
+
+        <div id="local-question-answers" class="modal-question-answers hidden" style="margin-bottom: 1.5rem;">
+          <p class="modal-question-prompt" id="local-real-question"></p>
+          <div id="local-answers-list" class="modal-answers-list"></div>
         </div>
 
         <div class="game-players-grid" id="game-players-grid">
@@ -713,11 +718,25 @@
             </div>
           </div>
 
+          <div class="results-section hidden" id="results-imposter-question-section">
+            <p class="results-label">The Imposter's Question was:</p>
+            <h3 class="results-word" id="results-imposter-question" style="font-size: 1rem; font-weight: 500; background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></h3>
+          </div>
+
           <div class="results-section">
             <p class="results-label">Vote Results:</p>
             <div class="vote-results" id="vote-results">
               <!-- Vote breakdown -->
             </div>
+          </div>
+        </div>
+
+        <!-- Room Leaderboard -->
+        <div class="results-section room-leaderboard" id="room-leaderboard">
+          <h4 class="leaderboard-title">🏆 Room Leaderboard</h4>
+          <p class="leaderboard-rules">Crew catches imposter → +1 each. Imposter survives → +1.</p>
+          <div id="room-leaderboard-list" class="room-leaderboard-list">
+            <!-- Sorted by points -->
           </div>
         </div>
 
@@ -863,6 +882,10 @@
                 <!-- Imposter names -->
               </div>
             </div>
+            <div class="answer-section hidden" id="modal-imposter-question-section">
+              <p class="answer-label">The Imposter's Question was:</p>
+              <h2 class="answer-word imposter" id="modal-imposter-question-text" style="font-size: 1rem; font-weight: 500;"></h2>
+            </div>
             <div class="answer-section" id="guess-results-section">
               <!-- Imposter guess results shown here -->
             </div>
@@ -980,6 +1003,10 @@
           </ul>
         </div>
 
+        <div class="league-play-action">
+          <button id="league-play-btn" class="btn btn-primary btn-large">🎮 Play League Game</button>
+        </div>
+
         <div class="league-standings-table" id="league-detail-table">
           <div class="league-empty" id="league-detail-empty">
             <p>No games played yet!</p>
@@ -990,6 +1017,74 @@
         <div class="league-detail-actions">
           <button id="league-leave-btn" class="btn btn-ghost">Leave League</button>
           <button id="league-delete-btn" class="btn btn-ghost btn-danger-text">Delete League</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- League Play Mode Screen -->
+    <section id="league-play-screen" class="screen">
+      <div class="container">
+        <div class="screen-header">
+          <button class="btn-back" id="league-play-back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2 id="league-play-title">League Game</h2>
+          <div class="spacer"></div>
+        </div>
+
+        <p class="league-play-subtitle" id="league-play-subtitle">Choose how to play</p>
+
+        <div class="mode-selection">
+          <button id="league-local-btn" class="mode-card">
+            <div class="mode-icon">📱</div>
+            <div class="mode-name">Local Game</div>
+            <div class="mode-desc">Pass the phone</div>
+          </button>
+          <button id="league-multiplayer-btn" class="mode-card">
+            <div class="mode-icon">🌐</div>
+            <div class="mode-name">Multiplayer</div>
+            <div class="mode-desc">Play online</div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- League Player Select Screen -->
+    <section id="league-players-screen" class="screen">
+      <div class="container">
+        <div class="screen-header">
+          <button class="btn-back" id="league-players-back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2>Select Players</h2>
+          <div class="spacer"></div>
+        </div>
+
+        <p class="league-players-hint">Choose who's playing this round</p>
+
+        <div id="league-members-list" class="league-members-list">
+          <!-- League member checkboxes rendered dynamically -->
+        </div>
+
+        <div class="league-add-player-row">
+          <input type="text" id="league-add-player-input" class="form-input" placeholder="Add new player..." maxlength="20" autocomplete="off">
+          <button id="league-add-player-btn" class="btn btn-secondary btn-small">+ Add</button>
+        </div>
+
+        <div class="league-players-footer">
+          <div class="imposter-controls">
+            <span class="imposter-label">Imposters:</span>
+            <button id="league-imposter-minus" class="btn-circle">−</button>
+            <span id="league-imposter-count" class="imposter-number">1</span>
+            <button id="league-imposter-plus" class="btn-circle">+</button>
+            <button id="league-imposter-random" class="btn-circle" title="Randomize">🎲</button>
+          </div>
+          <p class="league-player-count"><span id="league-selected-count">0</span> players selected</p>
+          <button id="league-players-continue" class="btn btn-primary btn-large" disabled>Choose Category</button>
         </div>
       </div>
     </section>
@@ -1289,6 +1384,16 @@
         <div class="confirm-actions">
           <button id="confirm-cancel-btn" class="btn btn-secondary">Cancel</button>
           <button id="confirm-ok-btn" class="btn btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="alert-modal" class="confirm-modal hidden">
+      <div class="confirm-backdrop"></div>
+      <div class="confirm-dialog">
+        <p id="alert-message" class="confirm-message"></p>
+        <div class="confirm-actions">
+          <button id="alert-ok-btn" class="btn btn-primary">OK</button>
         </div>
       </div>
     </div>

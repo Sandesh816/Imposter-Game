@@ -30,7 +30,11 @@ const gameState = {
     mpRevealed: false,
     selectedVote: null,
     chatMessages: [],
-    unreadMessages: 0
+    unreadMessages: 0,
+    // League game state
+    leagueCode: null,
+    isLeagueGame: false,
+    leagueImposterCount: 1
 };
 
 // ===============================================
@@ -57,6 +61,8 @@ const screens = {
     league: document.getElementById('league-screen'),
     leagueJoin: document.getElementById('league-join-screen'),
     leagueDetail: document.getElementById('league-detail-screen'),
+    leaguePlay: document.getElementById('league-play-screen'),
+    leaguePlayers: document.getElementById('league-players-screen'),
     customCat: document.getElementById('custom-cat-screen'),
     customCreate: document.getElementById('custom-create-screen'),
     community: document.getElementById('community-screen'),
@@ -168,6 +174,26 @@ const elements = {
     leagueDetailEmpty: document.getElementById('league-detail-empty'),
     leagueLeaveBtn: document.getElementById('league-leave-btn'),
     leagueDeleteBtn: document.getElementById('league-delete-btn'),
+    leaguePlayBtn: document.getElementById('league-play-btn'),
+
+    // League Play Mode
+    leaguePlayBackBtn: document.getElementById('league-play-back-btn'),
+    leaguePlayTitle: document.getElementById('league-play-title'),
+    leaguePlaySubtitle: document.getElementById('league-play-subtitle'),
+    leagueLocalBtn: document.getElementById('league-local-btn'),
+    leagueMultiplayerBtn: document.getElementById('league-multiplayer-btn'),
+
+    // League Player Select
+    leaguePlayersBackBtn: document.getElementById('league-players-back-btn'),
+    leagueMembersList: document.getElementById('league-members-list'),
+    leagueAddPlayerInput: document.getElementById('league-add-player-input'),
+    leagueAddPlayerBtn: document.getElementById('league-add-player-btn'),
+    leagueImposterMinus: document.getElementById('league-imposter-minus'),
+    leagueImposterPlus: document.getElementById('league-imposter-plus'),
+    leagueImposterCount: document.getElementById('league-imposter-count'),
+    leagueImposterRandom: document.getElementById('league-imposter-random'),
+    leagueSelectedCount: document.getElementById('league-selected-count'),
+    leaguePlayersContinue: document.getElementById('league-players-continue'),
 
     // Multiplayer - Choice
     mpBackToWelcome: document.getElementById('mp-back-to-welcome'),
@@ -238,6 +264,8 @@ const elements = {
     mpReadyBtn: document.getElementById('mp-ready-btn'),
     mpReadyBtnText: document.getElementById('mp-ready-btn-text'),
     mpLeaveGameWord: document.getElementById('mp-leave-game-word'),
+    mpLeaveGameDiscussion: document.getElementById('mp-leave-game-discussion'),
+    mpLeaveGameVoting: document.getElementById('mp-leave-game-voting'),
 
     // Multiplayer - Discussion
     mpCategoryDisplay: document.getElementById('mp-category-display'),
@@ -727,9 +755,38 @@ function showGameScreen() {
         elements.gamePlayersGrid.appendChild(card);
     });
 
-    // Set random first speaker
-    const randomIndex = Math.floor(Math.random() * gameState.players.length);
-    elements.firstSpeaker.textContent = gameState.players[randomIndex];
+    const localSpeakingOrder = document.getElementById('local-speaking-order');
+    const localQuestionAnswers = document.getElementById('local-question-answers');
+    const localRealQuestion = document.getElementById('local-real-question');
+    const localAnswersList = document.getElementById('local-answers-list');
+
+    if (gameState.gameType === 'question' && gameState.secretQuestion) {
+        localSpeakingOrder?.classList.add('hidden');
+        localQuestionAnswers?.classList.remove('hidden');
+        localRealQuestion.textContent = gameState.secretQuestion.real;
+        localAnswersList.innerHTML = '';
+        gameState.players.forEach((player, idx) => {
+            const item = document.createElement('div');
+            item.className = 'modal-answer-item';
+            const ans = gameState.playerAnswers[idx] || '(no answer)';
+            const playerSpan = document.createElement('span');
+            playerSpan.className = 'answer-player';
+            playerSpan.textContent = `${avatars[idx % avatars.length]} ${player}`;
+            const ansSpan = document.createElement('span');
+            ansSpan.className = 'answer-text';
+            ansSpan.textContent = `"${ans}"`;
+            item.appendChild(playerSpan);
+            item.appendChild(ansSpan);
+            localAnswersList.appendChild(item);
+        });
+        elements.revealAnswerBtn.querySelector('span').textContent = 'Vote';
+    } else {
+        localSpeakingOrder?.classList.remove('hidden');
+        localQuestionAnswers?.classList.add('hidden');
+        const randomIndex = Math.floor(Math.random() * gameState.players.length);
+        elements.firstSpeaker.textContent = gameState.players[randomIndex];
+        elements.revealAnswerBtn.querySelector('span').textContent = 'Reveal Answer';
+    }
 
     showScreen('game');
 }
@@ -935,6 +992,15 @@ function finalizeLeaguePoints() {
         elements.impostersList.appendChild(tag);
     });
 
+    // Show imposter question in question mode
+    const imposterQuestionSection = document.getElementById('modal-imposter-question-section');
+    if (gameState.gameType === 'question' && gameState.secretQuestion?.imposter) {
+        imposterQuestionSection.classList.remove('hidden');
+        document.getElementById('modal-imposter-question-text').textContent = gameState.secretQuestion.imposter;
+    } else {
+        imposterQuestionSection.classList.add('hidden');
+    }
+
     // Guess results
     elements.guessResultsSection.innerHTML = '';
     const hasGuesses = Object.keys(imposterGuesses).length > 0;
@@ -992,7 +1058,11 @@ function newRound() {
 }
 
 function restartGame() {
-    showScreen('players');
+    if (gameState.isLeagueGame) {
+        showScreen('leaguePlayers');
+    } else {
+        showScreen('players');
+    }
 }
 
 // Store current round data for save
@@ -1005,8 +1075,18 @@ async function buildLeagueSelector(pointsMap, correctVote, imposterSet) {
     currentRoundCorrectVote = correctVote;
     currentRoundImposterSet = imposterSet;
 
-    const leagues = await League.getJoinedLeagues();
     elements.leagueCheckboxList.innerHTML = '';
+
+    if (gameState.isLeagueGame && gameState.leagueCode) {
+        elements.leagueSelectorHint.classList.add('hidden');
+        const autoLabel = document.createElement('div');
+        autoLabel.className = 'league-auto-save-label';
+        autoLabel.textContent = `Points will be saved to 🏆 ${leagueGameName}`;
+        elements.leagueCheckboxList.appendChild(autoLabel);
+        return;
+    }
+
+    const leagues = await League.getJoinedLeagues();
 
     if (leagues.length === 0) {
         elements.leagueSelectorHint.classList.remove('hidden');
@@ -1019,7 +1099,6 @@ async function buildLeagueSelector(pointsMap, correctVote, imposterSet) {
         const members = await League.getLeagueMembers(league.code);
         const gamePlayers = gameState.players.map(p => p.trim().toLowerCase());
 
-        // Check if all league members are present in the current game
         const missingMembers = members.filter(m => !gamePlayers.includes(m.toLowerCase()));
         const allPresent = members.length === 0 || missingMembers.length === 0;
 
@@ -1035,25 +1114,32 @@ async function buildLeagueSelector(pointsMap, correctVote, imposterSet) {
     });
 }
 
-async function savePointsAndClose() {
-    // Get checked leagues
-    const checkboxes = elements.leagueCheckboxList.querySelectorAll('input[type=checkbox]:checked');
-    const leagueCodes = Array.from(checkboxes).map(cb => cb.value);
+async function saveLeaguePoints(leagueCode) {
+    if (!currentRoundPointsMap) return;
+    for (let idx = 0; idx < gameState.players.length; idx++) {
+        const entry = currentRoundPointsMap[idx];
+        const name = gameState.players[idx];
+        if (entry.points > 0) {
+            const isWin = currentRoundCorrectVote
+                ? !currentRoundImposterSet.has(idx)
+                : currentRoundImposterSet.has(idx);
+            await League.addPoints(leagueCode, name, entry.points, isWin);
+        } else {
+            await League.recordGame(leagueCode, name);
+        }
+    }
+}
 
-    if (leagueCodes.length > 0 && currentRoundPointsMap) {
-        // Save points to each selected league
-        for (const code of leagueCodes) {
-            for (let idx = 0; idx < gameState.players.length; idx++) {
-                const entry = currentRoundPointsMap[idx];
-                const name = gameState.players[idx];
-                if (entry.points > 0) {
-                    const isWin = currentRoundCorrectVote
-                        ? !currentRoundImposterSet.has(idx)
-                        : currentRoundImposterSet.has(idx);
-                    await League.addPoints(code, name, entry.points, isWin);
-                } else {
-                    await League.recordGame(code, name);
-                }
+async function savePointsAndClose() {
+    if (gameState.isLeagueGame && gameState.leagueCode) {
+        await saveLeaguePoints(gameState.leagueCode);
+    } else {
+        const checkboxes = elements.leagueCheckboxList.querySelectorAll('input[type=checkbox]:checked');
+        const leagueCodes = Array.from(checkboxes).map(cb => cb.value);
+
+        if (leagueCodes.length > 0 && currentRoundPointsMap) {
+            for (const code of leagueCodes) {
+                await saveLeaguePoints(code);
             }
         }
     }
@@ -1068,6 +1154,7 @@ async function savePointsAndClose() {
 let currentLeagueCode = null;
 
 async function showLeagueHub() {
+    clearLeagueGameState();
     showScreen('league');
     await renderLeagueHub();
 }
@@ -1252,6 +1339,141 @@ async function leagueDeleteConfirm() {
 }
 
 // ===============================================
+// LEAGUE GAME MODE
+// ===============================================
+let leagueGameName = '';
+let leagueExtraPlayers = [];
+
+async function showLeaguePlayScreen(code) {
+    gameState.leagueCode = code || currentLeagueCode;
+    gameState.isLeagueGame = true;
+    leagueExtraPlayers = [];
+
+    const detail = await League.getLeagueDetail(gameState.leagueCode);
+    if (detail) {
+        leagueGameName = detail.name;
+        elements.leaguePlayTitle.textContent = `🏆 ${detail.name}`;
+    }
+    showScreen('leaguePlay');
+}
+
+async function startLeagueLocal() {
+    gameState.mode = 'local';
+    gameState.leagueImposterCount = 1;
+    leagueExtraPlayers = [];
+
+    const members = await League.getLeagueMembers(gameState.leagueCode);
+    renderLeaguePlayers(members);
+    showScreen('leaguePlayers');
+}
+
+function startLeagueMultiplayer() {
+    gameState.mode = 'multiplayer';
+    showScreen('mpChoice');
+}
+
+function renderLeaguePlayers(members) {
+    elements.leagueMembersList.innerHTML = '';
+    const allPlayers = [...members, ...leagueExtraPlayers];
+
+    if (allPlayers.length === 0) {
+        elements.leagueMembersList.innerHTML = '<p class="league-players-hint">No members yet. Add players below.</p>';
+    }
+
+    allPlayers.forEach((name, idx) => {
+        const item = document.createElement('div');
+        item.className = 'league-member-item';
+        item.dataset.name = name;
+
+        const isExisting = idx < members.length;
+        item.innerHTML = `
+            <div class="member-checkbox"></div>
+            <span class="member-name">${name}</span>
+            ${isExisting ? `<span class="member-badge">Member</span>` : `<span class="member-badge" style="color: var(--text-muted);">New</span>`}
+        `;
+
+        item.addEventListener('click', () => {
+            item.classList.toggle('selected');
+            const check = item.querySelector('.member-checkbox');
+            check.textContent = item.classList.contains('selected') ? '✓' : '';
+            updateLeaguePlayerCount();
+        });
+
+        elements.leagueMembersList.appendChild(item);
+    });
+
+    updateLeaguePlayerCount();
+    elements.leagueImposterCount.textContent = gameState.leagueImposterCount;
+}
+
+function addLeaguePlayer() {
+    const name = elements.leagueAddPlayerInput.value.trim();
+    if (!name) return;
+
+    const existing = elements.leagueMembersList.querySelectorAll('.league-member-item');
+    for (const item of existing) {
+        if (item.dataset.name.toLowerCase() === name.toLowerCase()) {
+            elements.leagueAddPlayerInput.value = '';
+            return;
+        }
+    }
+
+    leagueExtraPlayers.push(name);
+    elements.leagueAddPlayerInput.value = '';
+
+    const item = document.createElement('div');
+    item.className = 'league-member-item selected';
+    item.dataset.name = name;
+    item.innerHTML = `
+        <div class="member-checkbox">✓</div>
+        <span class="member-name">${name}</span>
+        <span class="member-badge" style="color: var(--text-muted);">New</span>
+    `;
+
+    item.addEventListener('click', () => {
+        item.classList.toggle('selected');
+        const check = item.querySelector('.member-checkbox');
+        check.textContent = item.classList.contains('selected') ? '✓' : '';
+        updateLeaguePlayerCount();
+    });
+
+    elements.leagueMembersList.appendChild(item);
+    updateLeaguePlayerCount();
+}
+
+function updateLeaguePlayerCount() {
+    const selected = elements.leagueMembersList.querySelectorAll('.league-member-item.selected');
+    const count = selected.length;
+    elements.leagueSelectedCount.textContent = count;
+    elements.leaguePlayersContinue.disabled = count < 3;
+
+    const maxImposters = Math.max(1, Math.floor((count - 1) / 2));
+    if (gameState.leagueImposterCount > maxImposters) {
+        gameState.leagueImposterCount = maxImposters;
+        elements.leagueImposterCount.textContent = gameState.leagueImposterCount;
+    }
+    elements.leagueImposterMinus.disabled = gameState.leagueImposterCount <= 1;
+    elements.leagueImposterPlus.disabled = gameState.leagueImposterCount >= maxImposters || count < 3;
+}
+
+function confirmLeaguePlayers() {
+    const selected = elements.leagueMembersList.querySelectorAll('.league-member-item.selected');
+    gameState.players = Array.from(selected).map(item => item.dataset.name);
+    gameState.imposterCount = gameState.leagueImposterCount;
+    showScreen('gameType');
+}
+
+function clearLeagueGameState() {
+    gameState.leagueCode = null;
+    gameState.isLeagueGame = false;
+    gameState.leagueImposterCount = 1;
+    leagueGameName = '';
+    leagueExtraPlayers = [];
+    const mpSaved = document.getElementById('mp-league-saved');
+    if (mpSaved) mpSaved.remove();
+}
+
+// ===============================================
 // MULTIPLAYER MODE - Room Management
 // ===============================================
 async function createRoom() {
@@ -1276,7 +1498,7 @@ async function createRoom() {
         showScreen('mpLobby');
     } catch (error) {
         hideLoading();
-        alert('Failed to create room: ' + error.message);
+        showAlert('Failed to create room: ' + error.message);
     }
 }
 
@@ -1348,9 +1570,9 @@ function copyRoomCode() {
 function handleRoomUpdate(data) {
     if (!data) {
         // Room was deleted
-        alert('The host has closed the room.');
         gameState.roomData = null;
         showScreen('welcome');
+        showAlert('The host has closed the room.');
         return;
     }
 
@@ -1392,8 +1614,8 @@ function handleRoomUpdate(data) {
             break;
 
         case 'results':
+            updateResultsScreen(data);
             if (!screens.mpResults.classList.contains('active')) {
-                updateResultsScreen(data);
                 showScreen('mpResults');
             }
             break;
@@ -1524,7 +1746,7 @@ function selectMPCategory(categoryKey) {
         })
         .catch(err => {
             hideLoading();
-            alert('Failed to update category: ' + err.message);
+            showAlert('Failed to update category: ' + err.message);
         });
 }
 
@@ -1613,7 +1835,13 @@ function toggleMPReveal() {
 
 async function markReady() {
     await MP.markReady();
-    // Update button to show ready state
+    const playerCount = Object.keys(gameState.roomData?.players || {}).length;
+    if (playerCount < 3) {
+        elements.mpReadyBtn.classList.remove('btn-ready-confirmed');
+        elements.mpReadyBtnText.textContent = 'Too few players';
+        elements.mpReadyBtn.disabled = true;
+        return;
+    }
     elements.mpReadyBtn.classList.add('btn-ready-confirmed');
     elements.mpReadyBtnText.textContent = 'Waiting for others...';
     elements.mpReadyBtn.disabled = true;
@@ -1623,11 +1851,19 @@ function checkAllReady(data) {
     const gameType = data.gameType || 'word';
     const players = Object.values(data.players);
 
+    if (players.length < 3) {
+        elements.mpReadyBtn?.classList.remove('btn-ready-confirmed');
+        if (elements.mpReadyBtnText) elements.mpReadyBtnText.textContent = 'Too few players';
+        if (elements.mpReadyBtn) elements.mpReadyBtn.disabled = true;
+        elements.mpPlayersSeen.textContent = `Need at least 3 players to play. Only ${players.length} in the room.`;
+        return;
+    }
+
     const allReady = gameType === 'question'
-        ? players.every(p => p.hasSeenWord && p.answer) // All submitted answers
+        ? players.every(p => p.hasSeenWord && p.answer)
         : players.every(p => p.isReady);
 
-    if (allReady && players.length >= 3) {
+    if (allReady) {
         updateDiscussionScreen(data);
         showScreen('mpDiscussion');
     }
@@ -1760,7 +1996,7 @@ async function startVoting() {
         hideLoading();
     } catch (err) {
         hideLoading();
-        alert('Failed to start voting: ' + err.message);
+        showAlert('Failed to start voting: ' + err.message);
     }
 }
 
@@ -1904,7 +2140,7 @@ function checkAllVoted(data) {
 // ===============================================
 // MULTIPLAYER MODE - Results Screen
 // ===============================================
-function updateResultsScreen(data) {
+async function updateResultsScreen(data) {
     const results = MP.calculateVoteResults(data.players);
     const avatars = getPlayerAvatars();
 
@@ -1942,6 +2178,15 @@ function updateResultsScreen(data) {
         elements.resultsImposters.appendChild(tag);
     });
 
+    // Show imposter question in question mode
+    const resultsImposterQSection = document.getElementById('results-imposter-question-section');
+    if (gameType === 'question' && data.secretQuestion?.imposter) {
+        resultsImposterQSection?.classList.remove('hidden');
+        document.getElementById('results-imposter-question').textContent = data.secretQuestion.imposter;
+    } else {
+        resultsImposterQSection?.classList.add('hidden');
+    }
+
     // Show vote distribution
     elements.voteResults.innerHTML = '';
     let index = 0;
@@ -1962,6 +2207,28 @@ function updateResultsScreen(data) {
         skipItem.innerHTML = `⏭️ Skipped: ${results.skippedVotes}`;
         elements.voteResults.appendChild(skipItem);
     }
+
+    // Room Leaderboard
+    const leaderboardList = document.getElementById('room-leaderboard-list');
+    const scores = data.scores || {};
+    const leaderboardEntries = Object.entries(data.players || {}).map(([pid, player]) => ({
+        pid,
+        name: player.name,
+        points: scores[pid] || 0
+    }));
+    leaderboardEntries.sort((a, b) => b.points - a.points);
+
+    leaderboardList.innerHTML = '';
+    leaderboardEntries.forEach((entry, idx) => {
+        const row = document.createElement('div');
+        row.className = `room-leaderboard-row ${idx === 0 ? 'top-1' : ''}`;
+        row.innerHTML = `
+            <span class="leaderboard-rank">#${idx + 1}</span>
+            <span class="leaderboard-name">${avatars[idx % avatars.length]} ${entry.name}</span>
+            <span class="leaderboard-points">${entry.points} pt${entry.points !== 1 ? 's' : ''}</span>
+        `;
+        leaderboardList.appendChild(row);
+    });
 
     // === POST-GAME LOBBY AREA ===
 
@@ -1999,7 +2266,7 @@ function updateResultsScreen(data) {
         elements.resultsWaiting.classList.add('hidden');
         elements.resultsReadyControls.classList.add('hidden');
         elements.resultsChangeCategoryBtn.classList.remove('hidden');
-        elements.resultsSettings.classList.remove('hidden');
+        elements.resultsSettings?.classList.remove('hidden');
         if (elements.mpResultsAnonymousVoting) {
             elements.mpResultsAnonymousVoting.checked = data.anonymousVoting || false;
         }
@@ -2031,9 +2298,55 @@ function updateResultsScreen(data) {
             elements.resultsWaiting.classList.add('hidden');
         }
     }
+
+    if (gameState.isLeagueGame && gameState.leagueCode && !document.getElementById('mp-league-saved')) {
+        const playerIds = Object.keys(data.players);
+        const imposterIdSet = new Set(results.imposterIds);
+
+        for (const pid of playerIds) {
+            const player = data.players[pid];
+            const name = player.name;
+            const isImposter = imposterIdSet.has(pid);
+            let points = 0;
+            let isWin = false;
+
+            if (results.imposterWins) {
+                if (isImposter) {
+                    points = 1;
+                    isWin = true;
+                }
+            } else {
+                if (!isImposter) {
+                    points = 1;
+                    isWin = true;
+                }
+            }
+
+            if (points > 0) {
+                await League.addPoints(gameState.leagueCode, name, points, isWin);
+            } else {
+                await League.recordGame(gameState.leagueCode, name);
+            }
+        }
+
+        const savedMsg = document.createElement('div');
+        savedMsg.id = 'mp-league-saved';
+        savedMsg.className = 'league-auto-save-label';
+        savedMsg.textContent = `Points saved to 🏆 ${leagueGameName}`;
+        elements.voteResults.parentNode.insertBefore(savedMsg, elements.voteResults.nextSibling);
+    }
 }
 
 async function mpNewRound() {
+    const playerCount = Object.keys(gameState.roomData?.players || {}).length;
+    if (playerCount < 3) {
+        showAlert('Need at least 3 players to start a new round.');
+        return;
+    }
+
+    const mpSaved = document.getElementById('mp-league-saved');
+    if (mpSaved) mpSaved.remove();
+
     const gameType = gameState.roomData?.gameType || 'word';
     let category = gameState.roomData?.category || 'countries';
     if (gameType === 'question' && !category.startsWith('q:')) category = 'q:personalLife';
@@ -2051,7 +2364,7 @@ async function mpNewRound() {
         hideLoading();
     } catch (err) {
         hideLoading();
-        alert('Failed to start new round: ' + err.message);
+        showAlert('Failed to start new round: ' + err.message);
     }
 }
 
@@ -2062,7 +2375,7 @@ async function mpReturnToLobby() {
         hideLoading();
     } catch (err) {
         hideLoading();
-        alert('Failed to return to lobby: ' + err.message);
+        showAlert('Failed to return to lobby: ' + err.message);
     }
 }
 
@@ -2126,30 +2439,48 @@ async function sendChatMessage() {
 function initEventListeners() {
     // Mode Selection
     elements.localModeBtn?.addEventListener('click', () => {
+        clearLeagueGameState();
         gameState.mode = 'local';
         showScreen('gameType');
     });
 
     elements.multiplayerModeBtn?.addEventListener('click', () => {
+        clearLeagueGameState();
         gameState.mode = 'multiplayer';
         showScreen('mpChoice');
     });
 
     // Game Type Selection
-    document.getElementById('back-from-game-type')?.addEventListener('click', () => showScreen('welcome'));
+    document.getElementById('back-from-game-type')?.addEventListener('click', () => {
+        if (gameState.isLeagueGame) {
+            showScreen('leaguePlayers');
+        } else {
+            showScreen('welcome');
+        }
+    });
     document.getElementById('game-type-word-btn')?.addEventListener('click', () => {
         gameState.gameType = 'word';
-        if (gameState.players.length === 0) {
-            for (let i = 0; i < 4; i++) addPlayer();
+        if (gameState.isLeagueGame) {
+            renderCategories();
+            showScreen('category');
+        } else {
+            if (gameState.players.length === 0) {
+                for (let i = 0; i < 4; i++) addPlayer();
+            }
+            showScreen('players');
         }
-        showScreen('players');
     });
     document.getElementById('game-type-question-btn')?.addEventListener('click', () => {
         gameState.gameType = 'question';
-        if (gameState.players.length === 0) {
-            for (let i = 0; i < 4; i++) addPlayer();
+        if (gameState.isLeagueGame) {
+            renderCategories();
+            showScreen('category');
+        } else {
+            if (gameState.players.length === 0) {
+                for (let i = 0; i < 4; i++) addPlayer();
+            }
+            showScreen('players');
         }
-        showScreen('players');
     });
 
     // Local Mode - Player screen
@@ -2187,7 +2518,13 @@ function initEventListeners() {
     });
 
     // Local Mode - Category screen
-    elements.backToPlayers?.addEventListener('click', () => showScreen('players'));
+    elements.backToPlayers?.addEventListener('click', () => {
+        if (gameState.isLeagueGame) {
+            showScreen('gameType');
+        } else {
+            showScreen('players');
+        }
+    });
 
     // Local Mode - Reveal screen
     elements.backToCategory?.addEventListener('click', () => showScreen('category'));
@@ -2214,7 +2551,10 @@ function initEventListeners() {
 
     // League Hub
     elements.leagueBtn?.addEventListener('click', showLeagueHub);
-    elements.leagueBackBtn?.addEventListener('click', () => showScreen('welcome'));
+    elements.leagueBackBtn?.addEventListener('click', () => {
+        clearLeagueGameState();
+        showScreen('welcome');
+    });
     elements.createLeagueBtn?.addEventListener('click', showCreateLeagueForm);
     elements.joinLeagueBtn?.addEventListener('click', showJoinLeagueForm);
 
@@ -2231,9 +2571,60 @@ function initEventListeners() {
     elements.leagueCopyBtn?.addEventListener('click', copyLeagueCode);
     elements.leagueLeaveBtn?.addEventListener('click', leagueLeave);
     elements.leagueDeleteBtn?.addEventListener('click', leagueDeleteConfirm);
+    elements.leaguePlayBtn?.addEventListener('click', () => showLeaguePlayScreen());
+
+    // League Play Mode
+    elements.leaguePlayBackBtn?.addEventListener('click', () => {
+        clearLeagueGameState();
+        showLeagueDetail(currentLeagueCode);
+    });
+    elements.leagueLocalBtn?.addEventListener('click', startLeagueLocal);
+    elements.leagueMultiplayerBtn?.addEventListener('click', startLeagueMultiplayer);
+
+    // League Player Select
+    elements.leaguePlayersBackBtn?.addEventListener('click', () => showScreen('leaguePlay'));
+    elements.leagueAddPlayerBtn?.addEventListener('click', addLeaguePlayer);
+    elements.leagueAddPlayerInput?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') addLeaguePlayer();
+    });
+    elements.leaguePlayersContinue?.addEventListener('click', confirmLeaguePlayers);
+
+    elements.leagueImposterMinus?.addEventListener('click', () => {
+        if (gameState.leagueImposterCount > 1) {
+            gameState.leagueImposterCount--;
+            elements.leagueImposterCount.textContent = gameState.leagueImposterCount;
+            updateLeaguePlayerCount();
+        }
+    });
+
+    elements.leagueImposterPlus?.addEventListener('click', () => {
+        const selected = elements.leagueMembersList.querySelectorAll('.league-member-item.selected');
+        const maxImposters = Math.max(1, Math.floor((selected.length - 1) / 2));
+        if (gameState.leagueImposterCount < maxImposters) {
+            gameState.leagueImposterCount++;
+            elements.leagueImposterCount.textContent = gameState.leagueImposterCount;
+            updateLeaguePlayerCount();
+        }
+    });
+
+    elements.leagueImposterRandom?.addEventListener('click', () => {
+        const selected = elements.leagueMembersList.querySelectorAll('.league-member-item.selected');
+        const maxImposters = Math.max(1, Math.floor((selected.length - 1) / 2));
+        if (maxImposters >= 1) {
+            gameState.leagueImposterCount = Math.floor(Math.random() * maxImposters) + 1;
+            elements.leagueImposterCount.textContent = gameState.leagueImposterCount;
+            updateLeaguePlayerCount();
+        }
+    });
 
     // Multiplayer - Choice
-    elements.mpBackToWelcome?.addEventListener('click', () => showScreen('welcome'));
+    elements.mpBackToWelcome?.addEventListener('click', () => {
+        if (gameState.isLeagueGame) {
+            showScreen('leaguePlay');
+        } else {
+            showScreen('welcome');
+        }
+    });
     elements.createRoomBtn?.addEventListener('click', () => showScreen('mpCreate'));
     elements.joinRoomBtn?.addEventListener('click', () => showScreen('mpJoin'));
 
@@ -2285,6 +2676,11 @@ function initEventListeners() {
 
     // Start Game (First Time)
     elements.mpStartGameBtn?.addEventListener('click', async () => {
+        const playerCount = Object.keys(gameState.roomData?.players || {}).length;
+        if (playerCount < 3) {
+            showAlert('Need at least 3 players to start the game.');
+            return;
+        }
         const gameType = gameState.roomData?.gameType || 'word';
         let category = gameState.roomData.category || 'countries';
         if (gameType === 'question' && !category.startsWith('q:')) {
@@ -2303,7 +2699,7 @@ function initEventListeners() {
             hideLoading();
         } catch (err) {
             hideLoading();
-            alert('Failed to start game: ' + err.message);
+            showAlert('Failed to start game: ' + err.message);
         }
     });
 
@@ -2316,6 +2712,11 @@ function initEventListeners() {
 
     // Post-game "Play" button (Restart)
     elements.mpPlayAgainBtn?.addEventListener('click', async () => {
+        const playerCount = Object.keys(gameState.roomData?.players || {}).length;
+        if (playerCount < 3) {
+            showAlert('Need at least 3 players to start the game.');
+            return;
+        }
         const gameType = gameState.roomData?.gameType || 'word';
         let category = gameState.roomData?.category || 'countries';
         if (gameType === 'question' && !category.startsWith('q:')) category = 'q:personalLife';
@@ -2331,7 +2732,7 @@ function initEventListeners() {
             hideLoading();
         } catch (err) {
             hideLoading();
-            alert('Failed to start game: ' + err.message);
+            showAlert('Failed to start game: ' + err.message);
         }
     });
 
@@ -2342,8 +2743,11 @@ function initEventListeners() {
         await MP.setAnonymousVoting(e.target.checked);
     });
 
-    // Leave lobby button
+    // Leave buttons (all screens)
     elements.mpLeaveGameLobby?.addEventListener('click', leaveRoom);
+    elements.mpLeaveGameWord?.addEventListener('click', leaveRoom);
+    elements.mpLeaveGameDiscussion?.addEventListener('click', leaveRoom);
+    elements.mpLeaveGameVoting?.addEventListener('click', leaveRoom);
 
     // Multiplayer - Category
     elements.mpBackToLobby?.addEventListener('click', () => showScreen('mpLobby'));
@@ -2793,6 +3197,25 @@ function showConfirm(message, onConfirm) {
     });
     document.getElementById('confirm-cancel-btn').addEventListener('click', cleanup);
     document.querySelector('.confirm-backdrop').addEventListener('click', cleanup);
+}
+
+function showAlert(message, onDismiss) {
+    const modal = document.getElementById('alert-modal');
+    const msgEl = document.getElementById('alert-message');
+    const okBtn = document.getElementById('alert-ok-btn');
+
+    msgEl.textContent = message;
+    modal.classList.remove('hidden');
+
+    const cleanup = () => {
+        modal.classList.add('hidden');
+        okBtn.replaceWith(okBtn.cloneNode(true));
+    };
+
+    document.getElementById('alert-ok-btn').addEventListener('click', () => {
+        cleanup();
+        if (onDismiss) onDismiss();
+    });
 }
 
 // ===============================================
