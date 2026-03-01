@@ -253,6 +253,35 @@ body {
   height: 20px;
 }
 
+.btn-home-global {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 0.75rem);
+  right: calc(env(safe-area-inset-right) + 0.75rem);
+  z-index: 120;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(26, 26, 46, 0.78);
+  color: var(--text-primary);
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: all var(--transition-fast);
+}
+
+.btn-home-global:hover {
+  background: rgba(37, 37, 66, 0.9);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.btn-home-global:active {
+  transform: translateY(1px);
+}
+
 .spacer {
   width: 40px;
 }

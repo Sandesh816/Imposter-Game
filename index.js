@@ -6,6 +6,7 @@ import * as League from './league.js';
 import * as CustomCat from './customCategories.js';
 import * as Auth from './auth.js';
 import * as AIGen from './aiGenerate.js';
+import * as GameEngine from './gameEngine.js';
 
 // ===============================================
 // Game State
@@ -365,32 +366,16 @@ const elements = {
 // Utility Functions
 // ===============================================
 function shuffleArray(array) {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const randomBuffer = new Uint32Array(1);
-        window.crypto.getRandomValues(randomBuffer);
-        const j = Math.floor((randomBuffer[0] / 4294967296) * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
+    return GameEngine.secureShuffle(array, window.crypto);
 }
 
 function getRandomInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    return GameEngine.getRandomInt(min, max);
 }
 
 function getRandomWord(category) {
-    // Support custom categories (prefixed with 'custom:')
-    if (typeof category === 'string' && category.startsWith('custom:')) {
-        const localCats = CustomCat.getLocalCategoriesSync();
-        const cat = localCats.find(c => 'custom:' + c.id === category);
-        if (cat && cat.words.length > 0) {
-            return cat.words[getRandomInt(0, cat.words.length - 1)];
-        }
-        return 'Mystery';
-    }
-    const words = CATEGORIES[category].words;
-    return words[getRandomInt(0, words.length - 1)];
+    const localCats = CustomCat.getLocalCategoriesSync();
+    return GameEngine.getRandomWord(category, CATEGORIES, localCats);
 }
 
 function getPlayerAvatars() {
@@ -622,24 +607,25 @@ function selectCategory(categoryKey) {
 // LOCAL MODE - Game Logic
 // ===============================================
 function startLocalGame() {
-    if (gameState.gameType === 'word') {
-        gameState.secretWord = getRandomWord(gameState.selectedCategory);
-        gameState.secretQuestion = null;
-        gameState.playerAnswers = [];
-    } else if (gameState.gameType === 'question' && gameState.selectedCategory?.startsWith('q:')) {
-        const pair = getRandomQuestion(gameState.selectedCategory.slice(2));
-        if (pair) {
-            gameState.secretQuestion = pair;
-            gameState.playerAnswers = new Array(gameState.players.length).fill(null);
-        }
-    }
+    const localCats = CustomCat.getLocalCategoriesSync();
+    const round = GameEngine.createLocalRound({
+        gameType: gameState.gameType,
+        selectedCategory: gameState.selectedCategory,
+        players: gameState.players,
+        imposterCount: gameState.imposterCount,
+        categories: CATEGORIES,
+        questionCategories: typeof QUESTION_CATEGORIES !== 'undefined' ? QUESTION_CATEGORIES : {},
+        customCategories: localCats,
+        getRandomQuestion,
+        cryptoObj: window.crypto
+    });
 
-    const playerIndices = gameState.players.map((_, index) => index);
-    const shuffledIndices = shuffleArray(playerIndices);
-    gameState.imposterIndices = shuffledIndices.slice(0, gameState.imposterCount);
-
-    gameState.currentRevealIndex = 0;
-    gameState.isRevealed = false;
+    gameState.secretWord = round.secretWord;
+    gameState.secretQuestion = round.secretQuestion;
+    gameState.playerAnswers = round.playerAnswers;
+    gameState.imposterIndices = round.imposterIndices;
+    gameState.currentRevealIndex = round.currentRevealIndex;
+    gameState.isRevealed = round.isRevealed;
 
     updateRevealScreen();
     showScreen('reveal');
@@ -3562,6 +3548,10 @@ function initAuth() {
     });
 }
 
-// Start the app
-document.addEventListener('DOMContentLoaded', init);
-
+// Start the app.
+// Support both normal page load and dynamic script injection (React bridge).
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}

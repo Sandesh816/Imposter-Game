@@ -4,7 +4,20 @@
   "description": "A fun party game where players get a secret word, except for the imposter(s) who get a different message. Players must discuss and figure out who the imposter is!",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run test:unit",
+    "test:unit": "vitest run tests/unit",
+    "test:unit:watch": "vitest tests/unit",
+    "test:integration": "firebase emulators:exec --only database --project imposter-sandeshg \"vitest run tests/integration\"",
+    "test:integration:local": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "test:e2e:deployed": "PLAYWRIGHT_BASE_URL=https://imposter-sandeshg.web.app playwright test tests/e2e/multiplayer.deployed.spec.cjs",
+    "test:e2e:deployed:local": "PLAYWRIGHT_BASE_URL=https://imposter-sandeshg.web.app PLAYWRIGHT_CHROMIUM_CHANNEL=chrome playwright test tests/e2e/multiplayer.deployed.spec.cjs",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:install": "playwright install chromium",
+    "sync:legacy": "node scripts/sync-legacy-assets.mjs",
+    "dev": "npm run sync:legacy && vite",
+    "build": "npm run sync:legacy && vite build",
+    "preview": "vite preview"
   },
   "repository": {
     "type": "git",
@@ -23,9 +36,17 @@
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
     "@capacitor/ios": "^8.1.0",
-    "@capacitor/status-bar": "^8.0.1"
+    "@capacitor/status-bar": "^8.0.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5"
+    "@playwright/test": "^1.54.2",
+    "@firebase/rules-unit-testing": "^3.0.3",
+    "@capacitor/assets": "^3.0.5",
+    "@vitejs/plugin-react": "^5.1.4",
+    "firebase": "^10.8.0",
+    "vite": "^7.3.1",
+    "vitest": "^3.2.4"
   }
 }

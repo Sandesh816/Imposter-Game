@@ -1,21 +1,14 @@
 {
   "hosting": {
-    "public": ".",
+    "public": "www",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
       "android/**",
       "ios/**",
-      "www/**",
       "resources/**",
-      "icons/**",
-      "package.json",
-      "package-lock.json",
-      "capacitor.config.json",
-      "testPublish.js",
-      "README.md",
-      "LICENSE"
+      "icons/**"
     ],
     "headers": [
       {
@@ -40,5 +33,15 @@
   },
   "database": {
     "rules": "database.rules.json"
+  },
+  "emulators": {
+    "database": {
+      "host": "127.0.0.1",
+      "port": 9002
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
   }
 }

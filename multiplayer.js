@@ -1,7 +1,7 @@
 // Multiplayer Module for Secret Word Imposter
 // Uses Firebase Realtime Database for real-time synchronization
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
     getDatabase,
     ref,
@@ -18,6 +18,7 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth
 
 // Firebase configuration
 import { firebaseConfig } from "./firebase-config.js";
+import { calculateVoteResults, calculateRoundPoints } from "./multiplayerLogic.js";
 
 // Initialize Firebase
 // Re-use auth-app (shared Firebase app instance)
@@ -290,26 +291,7 @@ async function showResults() {
 
     const players = snapshot.val();
     const results = calculateVoteResults(players);
-    const imposterIdSet = new Set(results.imposterIds);
-
-    const pointsMap = {};
-    Object.keys(players).forEach(pid => {
-        pointsMap[pid] = 0;
-    });
-
-    const correctVote = results.imposterIds.length > 0 && results.eliminated && imposterIdSet.has(results.eliminated) && !results.tie;
-
-    if (correctVote) {
-        Object.keys(players).forEach(pid => {
-            if (!imposterIdSet.has(pid)) {
-                pointsMap[pid] = 1;
-            }
-        });
-    } else if (results.imposterWins) {
-        results.imposterIds.forEach(pid => {
-            pointsMap[pid] = 1;
-        });
-    }
+    const pointsMap = calculateRoundPoints(players, results);
 
     await addRoomPoints(pointsMap);
     await update(ref(db, `rooms/${roomCode}`), { status: 'results' });
@@ -495,76 +477,6 @@ function getPlayerId() {
 
 function getRoomCode() {
     return multiplayerState.roomCode;
-}
-
-// ===============================================
-// Vote Calculation
-// ===============================================
-function calculateVoteResults(players) {
-    const votes = {};
-    let totalVotes = 0;
-    let skippedVotes = 0;
-
-    Object.entries(players).forEach(([pid, player]) => {
-        if (player.vote === 'skip') {
-            skippedVotes++;
-            totalVotes++;
-        } else if (player.vote) {
-            votes[player.vote] = (votes[player.vote] || 0) + 1;
-            totalVotes++;
-        }
-    });
-
-    // Find who got the most votes
-    let maxVotes = 0;
-    let eliminated = null;
-    let tie = false;
-
-    Object.entries(votes).forEach(([pid, count]) => {
-        if (count > maxVotes) {
-            maxVotes = count;
-            eliminated = pid;
-            tie = false;
-        } else if (count === maxVotes) {
-            tie = true;
-        }
-    });
-
-    // Check if skip won
-    if (skippedVotes > maxVotes) {
-        eliminated = null;
-        tie = false;
-    } else if (skippedVotes === maxVotes) {
-        tie = true;
-    }
-
-    // Determine winner
-    const imposterIds = Object.entries(players)
-        .filter(([_, p]) => p.isImposter)
-        .map(([id, _]) => id);
-
-    let imposterWins = false;
-
-    if (tie || !eliminated) {
-        // No one eliminated = imposter survives = imposter wins
-        imposterWins = true;
-    } else if (imposterIds.includes(eliminated)) {
-        // Imposter was voted out = crew wins
-        imposterWins = false;
-    } else {
-        // Wrong person voted out = imposter wins
-        imposterWins = true;
-    }
-
-    return {
-        votes,
-        skippedVotes,
-        totalVotes,
-        eliminated,
-        tie,
-        imposterWins,
-        imposterIds
-    };
 }
 
 // ===============================================

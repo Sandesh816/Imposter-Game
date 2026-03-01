@@ -4,6 +4,7 @@
 
 # Dependencies
 node_modules/
+.npm-cache/
 
 # OS files
 .DS_Store
@@ -28,8 +29,11 @@ ai-config.js
 android/
 ios/
 www/
+public/legacy/
 
 # Logs
 *.log
 npm-debug.log*
 firebase-debug.log*
+playwright-report/
+test-results/

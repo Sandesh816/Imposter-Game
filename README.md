@@ -49,6 +49,25 @@ npx serve .
    firebase deploy
    ```
 
+## CI Gate (GitHub Actions)
+
+- Workflow file: `.github/workflows/ci-deploy.yml`
+- Test gate before deployment:
+  - `npm run test:unit`
+  - `npm run test:integration`
+  - `npm run test:e2e:deployed`
+- Only after tests pass on `main`, the workflow builds and deploys Hosting.
+
+Required repository secret:
+
+- `FIREBASE_TOKEN` (GitHub Settings -> Secrets and variables -> Actions)
+
+Helpful local command (uses installed Chrome channel):
+
+```bash
+npm run test:e2e:deployed:local
+```
+
 ## Categories Included
 
 - 🌍 Countries (100+)
