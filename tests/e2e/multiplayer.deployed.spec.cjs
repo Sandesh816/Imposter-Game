@@ -134,6 +134,14 @@ async function waitForResults(page) {
   await expect(activeScreen(page).locator('.results-header h2')).toBeVisible({ timeout: APP_TIMEOUT });
 }
 
+async function ensureReadyForNextRound(page) {
+  const readyBtn = activeScreen(page).getByRole('button', { name: /^I'm Ready$/ });
+  if (await isVisible(readyBtn, 2000)) {
+    await readyBtn.click();
+    await expect(activeScreen(page).getByRole('button', { name: /^Ready!$/ })).toBeVisible({ timeout: APP_TIMEOUT });
+  }
+}
+
 async function leaveRoomIfPossible(page) {
   try {
     const chatOverlay = page.locator('.chat-overlay.active');
@@ -153,7 +161,7 @@ async function leaveRoomIfPossible(page) {
 test.describe('Phase 3 - deployed multiplayer flow', () => {
   test.setTimeout(300000);
 
-  test('host and players can finish a full online round with chat and leaderboard', async ({ browser, baseURL }) => {
+  test('host and players can finish a full online round with chat, leaderboard, and start a new round', async ({ browser, baseURL }) => {
     const runSuffix = `${Date.now()}`.slice(-6);
     const names = {
       host: `Host${runSuffix}`,
@@ -235,6 +243,21 @@ test.describe('Phase 3 - deployed multiplayer flow', () => {
       await expect(activeScreen(hostPage)).toContainText(names.host);
       await expect(activeScreen(hostPage)).toContainText(names.p2);
       await expect(activeScreen(hostPage)).toContainText(names.p3);
+
+      await Promise.all([
+        ensureReadyForNextRound(player2Page),
+        ensureReadyForNextRound(player3Page),
+      ]);
+
+      const newRoundBtn = activeScreen(hostPage).getByRole('button', { name: /^New Round$/ });
+      await expect(newRoundBtn).toBeEnabled({ timeout: APP_TIMEOUT });
+      await newRoundBtn.click();
+
+      await Promise.all([
+        expect(activeScreen(hostPage).getByRole('heading', { name: /Your Role/i })).toBeVisible({ timeout: APP_TIMEOUT }),
+        expect(activeScreen(player2Page).getByRole('heading', { name: /Your Role/i })).toBeVisible({ timeout: APP_TIMEOUT }),
+        expect(activeScreen(player3Page).getByRole('heading', { name: /Your Role/i })).toBeVisible({ timeout: APP_TIMEOUT }),
+      ]);
     } finally {
       await leaveRoomIfPossible(hostPage);
       await Promise.all([
