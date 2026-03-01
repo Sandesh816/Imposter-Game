@@ -21,7 +21,6 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
-firebase-config.js
 ai-config.js
 
 

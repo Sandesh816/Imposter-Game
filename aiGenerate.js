@@ -9,7 +9,9 @@ let _builtInKey = null;
 async function getBuiltInKey() {
     if (_builtInKey !== null) return _builtInKey;
     try {
-        const cfg = await import('./ai-config.js');
+        // Keep AI key optional: avoid bundler hard-resolving a gitignored file.
+        const cfgPath = './ai-config.js';
+        const cfg = await import(/* @vite-ignore */ cfgPath);
         _builtInKey = (cfg.GEMINI_API_KEY || '').trim();
     } catch {
         _builtInKey = '';
