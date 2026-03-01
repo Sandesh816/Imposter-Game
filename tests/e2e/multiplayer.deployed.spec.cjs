@@ -115,7 +115,23 @@ async function castVote(page, targetName) {
   const voteCard = activeScreen(page).locator('.voting-card', { hasText: targetName }).first();
   await expect(voteCard).toBeVisible({ timeout: APP_TIMEOUT });
   await voteCard.click();
-  await activeScreen(page).getByRole('button', { name: /^Submit Vote$/ }).click();
+  const submitBtn = activeScreen(page).getByRole('button', { name: /^Submit Vote$/ });
+  await submitBtn.click();
+  await expect(submitBtn).toBeDisabled({ timeout: APP_TIMEOUT });
+}
+
+async function waitForVoteCount(page, voted, total) {
+  const resultsHeading = activeScreen(page).locator('.results-header h2');
+  if (await isVisible(resultsHeading, 1200)) {
+    return;
+  }
+  await expect(activeScreen(page).locator('.voting-status')).toContainText(new RegExp(`\\b${voted}\\b\\s*of\\s*\\b${total}\\b`), {
+    timeout: APP_TIMEOUT,
+  });
+}
+
+async function waitForResults(page) {
+  await expect(activeScreen(page).locator('.results-header h2')).toBeVisible({ timeout: APP_TIMEOUT });
 }
 
 async function leaveRoomIfPossible(page) {
@@ -204,17 +220,15 @@ test.describe('Phase 3 - deployed multiplayer flow', () => {
         expect(activeScreen(player3Page).getByRole('heading', { name: /Vote!/i })).toBeVisible({ timeout: APP_TIMEOUT }),
       ]);
 
-      await Promise.all([
-        castVote(hostPage, names.p2),
-        castVote(player2Page, names.host),
-        castVote(player3Page, names.host),
-      ]);
+      await castVote(hostPage, names.p2);
+      await waitForVoteCount(hostPage, 1, 3);
+      await castVote(player2Page, names.host);
+      await waitForVoteCount(hostPage, 2, 3);
+      await castVote(player3Page, names.host);
+      await waitForVoteCount(hostPage, 3, 3);
 
-      await Promise.all([
-        expect(activeScreen(hostPage).locator('.results-header h2')).toBeVisible({ timeout: APP_TIMEOUT }),
-        expect(activeScreen(player2Page).locator('.results-header h2')).toBeVisible({ timeout: APP_TIMEOUT }),
-        expect(activeScreen(player3Page).locator('.results-header h2')).toBeVisible({ timeout: APP_TIMEOUT }),
-      ]);
+      await waitForResults(hostPage);
+      await waitForResults(player2Page);
 
       await expect(activeScreen(hostPage)).toContainText('Room Leaderboard', { timeout: APP_TIMEOUT });
       await expect(activeScreen(hostPage).locator('.room-leaderboard-row')).toHaveCount(3, { timeout: APP_TIMEOUT });
