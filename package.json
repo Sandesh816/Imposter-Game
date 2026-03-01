@@ -7,7 +7,7 @@
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/unit",
     "test:unit:watch": "vitest tests/unit",
-    "test:integration": "firebase emulators:exec --only database --project imposter-sandeshg \"vitest run tests/integration\"",
+    "test:integration": "npx firebase-tools emulators:exec --only database --project imposter-sandeshg \"vitest run tests/integration\"",
     "test:integration:local": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "test:e2e:deployed": "PLAYWRIGHT_BASE_URL=https://imposter-sandeshg.web.app playwright test tests/e2e/multiplayer.deployed.spec.cjs",
@@ -43,6 +43,7 @@
   "devDependencies": {
     "@playwright/test": "^1.54.2",
     "@firebase/rules-unit-testing": "^3.0.3",
+    "firebase-tools": "^13.35.1",
     "@capacitor/assets": "^3.0.5",
     "@vitejs/plugin-react": "^5.1.4",
     "firebase": "^10.8.0",
