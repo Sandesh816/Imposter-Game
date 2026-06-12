@@ -218,6 +218,11 @@ function getRandomQuestion(categoryKey) {
     return cat.questions[idx];
 }
 
+if (typeof globalThis !== 'undefined') {
+    globalThis.QUESTION_CATEGORIES = QUESTION_CATEGORIES;
+    globalThis.getRandomQuestion = getRandomQuestion;
+}
+
 // Export for use in the game
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { QUESTION_CATEGORIES, getRandomQuestion };

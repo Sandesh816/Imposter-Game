@@ -37,6 +37,38 @@ const auth = getAuth(authApp);
 const db = getDatabase(authApp);
 const googleProvider = new GoogleAuthProvider();
 
+function redirectLocalIpToLocalhost() {
+    if (typeof window === 'undefined') return false;
+    if (window.location.hostname !== '127.0.0.1') return false;
+    const next = new URL(window.location.href);
+    next.hostname = 'localhost';
+    window.location.replace(next.toString());
+    return true;
+}
+
+function friendlyAuthError(err) {
+    const code = err?.code || '';
+    const origin = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : 'this domain';
+    const host = (typeof window !== 'undefined' && window.location?.hostname) ? window.location.hostname : '';
+
+    switch (code) {
+        case 'auth/unauthorized-domain':
+            return new Error(
+                `Google sign-in is not allowed on ${origin}. Add "${host}" to Firebase Console > Authentication > Settings > Authorized domains.`
+            );
+        case 'auth/operation-not-allowed':
+            return new Error('Google sign-in is disabled. Enable the Google provider in Firebase Authentication > Sign-in method.');
+        case 'auth/popup-blocked':
+            return new Error('Popup was blocked by the browser. Allow popups for this site and try again.');
+        case 'auth/popup-closed-by-user':
+            return new Error('Google sign-in popup was closed before completion.');
+        case 'auth/cancelled-popup-request':
+            return new Error('A sign-in popup is already in progress.');
+        default:
+            return err instanceof Error ? err : new Error('Authentication failed.');
+    }
+}
+
 // ===============================================
 // Auth State
 // ===============================================
@@ -62,14 +94,21 @@ function getCurrentUid() {
  * Works for both new users (sign up) and existing users (log in).
  */
 async function signInWithGoogle() {
-    const result = await signInWithPopup(auth, googleProvider);
-    if (result && result.user) {
-        const isNewUser = getAdditionalUserInfo(result)?.isNewUser || false;
-        await ensureProfile(result.user);
-        await migrateLocalStorage(result.user.uid);
-        return { user: result.user, isNewUser };
+    try {
+        const result = await signInWithPopup(auth, googleProvider);
+        if (result && result.user) {
+            const isNewUser = getAdditionalUserInfo(result)?.isNewUser || false;
+            await ensureProfile(result.user);
+            await migrateLocalStorage(result.user.uid);
+            return { user: result.user, isNewUser };
+        }
+        return null;
+    } catch (err) {
+        if (err?.code === 'auth/unauthorized-domain' && redirectLocalIpToLocalhost()) {
+            throw new Error('Switching to localhost for Google sign-in...');
+        }
+        throw friendlyAuthError(err);
     }
-    return null;
 }
 
 /**

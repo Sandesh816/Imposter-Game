@@ -301,6 +301,10 @@ const CATEGORIES = {
   }
 };
 
+if (typeof globalThis !== 'undefined') {
+  globalThis.CATEGORIES = CATEGORIES;
+}
+
 // Export for use in the game
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = CATEGORIES;

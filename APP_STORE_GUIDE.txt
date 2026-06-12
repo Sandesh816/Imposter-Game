@@ -1,0 +1,178 @@
+===============================================
+SECRET WORD IMPOSTER — App Store Publishing Guide
+===============================================
+
+WHAT HAS BEEN DONE (Automated)
+===============================================
+
+1. INITIALIZED NPM PROJECT
+   - Created package.json
+   - Installed: @capacitor/core, @capacitor/cli, @capacitor/android,
+     @capacitor/ios, @capacitor/status-bar, @capacitor/assets
+
+2. CONFIGURED CAPACITOR
+   - Created capacitor.config.json
+   - App ID: com.secretword.imposter
+   - App Name: Secret Word Imposter
+   - Points to live Firebase URL: https://imposter-sandeshg.web.app
+   - Status bar configured (dark style, #0f0a1e background)
+
+3. GENERATED NATIVE PROJECTS
+   - android/ folder — full Android Studio project
+   - ios/ folder — full Xcode project
+   - Both synced with Capacitor plugins
+
+4. GENERATED APP ICONS AND SPLASH SCREENS
+   - Source files: resources/icon.png, resources/splash.png
+   - 87 Android assets (adaptive icons, round icons, splash in all densities)
+   - 10 iOS assets (AppIcon, splash screens)
+   - 7 PWA icons (in icons/ folder)
+   - Background color: #0f0a1e (matches app theme)
+
+5. ADDED SAFE AREA SUPPORT
+   - CSS safe area insets added to body (for iPhone notches)
+   - viewport-fit=cover added to HTML meta tag
+   - @capacitor/status-bar plugin installed
+
+6. UPDATED CONFIGURATION FILES
+   - firebase.json: ignore list updated to exclude android/, ios/, 
+     node_modules/, www/, resources/, icons/, package files
+   - .gitignore: added android/, ios/, www/, ai-config.js
+
+
+WHAT YOU NEED TO DO (Manual Steps)
+===============================================
+
+STEP 1: INSTALL ANDROID STUDIO (for Google Play)
+-------------------------------------------------
+Download: https://developer.android.com/studio
+- Free to install and use
+- Requires ~2-4 GB disk space
+
+STEP 2: BUILD ANDROID APP
+-------------------------------------------------
+Run these commands in your project folder:
+
+    npx cap sync android
+    npx cap open android
+
+This opens Android Studio. Then:
+1. Wait for Gradle sync to finish (first time takes a few minutes)
+2. Go to Build > Generate Signed Bundle / APK
+3. Select "Android App Bundle"
+4. Create a new keystore (signing key):
+   - Choose a file location and password
+   - Fill in the certificate info
+   - SAVE THIS KEYSTORE FILE — you need it for every future update
+5. Build the .aab file
+6. The .aab file will be in: android/app/release/
+
+STEP 3: UPLOAD TO GOOGLE PLAY
+-------------------------------------------------
+1. Go to https://play.google.com/console
+2. Pay the $25 one-time developer fee
+3. Create a new app:
+   - App name: Secret Word Imposter
+   - Default language: English
+   - App type: Game
+   - Category: Word / Party
+4. Fill in the store listing:
+   - Short description (80 chars max)
+   - Full description (4000 chars max)
+   - Screenshots (at least 2, phone size)
+   - Feature graphic (1024x500)
+   - App icon (512x512 — use resources/icon.png)
+5. Complete the content rating questionnaire
+6. Add a privacy policy URL
+7. Go to Production > Create new release
+8. Upload the .aab file
+9. Submit for review (usually takes 1-7 days)
+
+STEP 4: BUILD iOS APP (requires Mac with Xcode)
+-------------------------------------------------
+Run these commands in your project folder:
+
+    npx cap sync ios
+    npx cap open ios
+
+This opens Xcode. Then:
+1. Select the "App" target in the left sidebar
+2. Under "Signing & Capabilities":
+   - Select your Apple Developer team
+   - Bundle identifier should be: com.secretword.imposter
+3. Select a connected device or "Any iOS Device"
+4. Go to Product > Archive
+5. Once archived, click "Distribute App"
+6. Choose "App Store Connect"
+7. Follow the upload wizard
+
+STEP 5: UPLOAD TO APP STORE
+-------------------------------------------------
+1. Go to https://appstoreconnect.apple.com
+2. Requires Apple Developer Program ($99/year)
+   Sign up at: https://developer.apple.com/programs/
+3. Create a new app in App Store Connect:
+   - Name: Secret Word Imposter
+   - Bundle ID: com.secretword.imposter
+   - SKU: secretword-imposter
+4. Fill in the store listing:
+   - Description, keywords, support URL
+   - Screenshots (iPhone 6.7", 6.5", 5.5" sizes)
+   - App icon (1024x1024 — use resources/icon.png)
+5. Add a privacy policy URL (required)
+6. Submit for review (usually takes 1-3 days)
+
+
+PRIVACY POLICY
+===============================================
+Both stores require a privacy policy URL. You can create a simple one:
+
+1. Create a file called privacy.html in your project
+2. Deploy it with Firebase (it'll be at imposter-sandeshg.web.app/privacy.html)
+3. Content should cover:
+   - What data you collect (Firebase anonymous auth, display names)
+   - How data is used (gameplay only)
+   - Third-party services (Firebase, Google Gemini API)
+   - Contact information
+
+
+UPDATING THE APP AFTER PUBLISHING
+===============================================
+Since the app loads from your live Firebase URL, updating is simple:
+
+    firebase deploy --only hosting
+
+Users automatically get the latest version without needing to update
+the app from the store.
+
+You only need to rebuild and resubmit to the stores if you:
+- Change the app icon or splash screen
+- Add new native plugins (e.g., push notifications)
+- Change the Capacitor config
+
+
+PROJECT STRUCTURE (New Files)
+===============================================
+Imposter-Game/
+├── package.json              — npm dependencies
+├── package-lock.json         — dependency lock file
+├── capacitor.config.json     — Capacitor configuration
+├── resources/
+│   ├── icon.png              — Source app icon (1024x1024)
+│   └── splash.png            — Source splash screen
+├── www/
+│   └── index.html            — Fallback loading page
+├── icons/                    — PWA icons (auto-generated)
+├── android/                  — Android Studio project (gitignored)
+│   └── app/src/main/res/     — Generated icons & splash screens
+├── ios/                      — Xcode project (gitignored)
+│   └── App/App/Assets.xcassets/ — Generated icons & splash screens
+└── node_modules/             — Dependencies (gitignored)
+
+
+COSTS SUMMARY
+===============================================
+Google Play:  $25 one-time
+App Store:    $99/year
+Total first year: $124
+Total subsequent years: $99/year

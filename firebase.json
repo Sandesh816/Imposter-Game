@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": ".",
+    "public": "www",
     "ignore": [
       "firebase.json",
       "firebase-debug.log",
@@ -12,7 +12,10 @@
       ".firebase/**",
       ".claude/**",
       "**/node_modules/**",
-      "README.md"
+      "android/**",
+      "ios/**",
+      "resources/**",
+      "icons/**"
     ],
     "headers": [
       {
@@ -46,5 +49,15 @@
   },
   "database": {
     "rules": "database.rules.json"
+  },
+  "emulators": {
+    "database": {
+      "host": "127.0.0.1",
+      "port": 9002
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
   }
 }

@@ -22,7 +22,7 @@
             }
         },
         "communityCategories": {
-            ".read": "auth !== null",
+            ".read": true,
             ".write": "auth !== null",
             "$catId": {
                 "upvotedBy": {
