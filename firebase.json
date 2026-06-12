@@ -3,11 +3,27 @@
     "public": ".",
     "ignore": [
       "firebase.json",
+      "firebase-debug.log",
+      "database.rules.json",
+      "firebase-config.example.js",
+      "LICENSE",
       "**/.*",
+      ".git/**",
+      ".firebase/**",
+      ".claude/**",
       "**/node_modules/**",
       "README.md"
     ],
     "headers": [
+      {
+        "source": "/",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
       {
         "source": "**/*.@(js|css)",
         "headers": [

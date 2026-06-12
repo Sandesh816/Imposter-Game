@@ -274,7 +274,18 @@ async function showResults() {
     }
 
     const { roomCode } = multiplayerState;
-    await update(ref(db, `rooms/${roomCode}`), { status: 'results' });
+
+    // isReady meant "ready for discussion" during the round; clear it for
+    // non-host players so the post-round "I'm ready" flow starts fresh
+    // (the host counts as ready implicitly).
+    const playersSnap = await get(ref(db, `rooms/${roomCode}/players`));
+    const updates = { [`rooms/${roomCode}/status`]: 'results' };
+    if (playersSnap.exists()) {
+        Object.entries(playersSnap.val()).forEach(([pid, player]) => {
+            updates[`rooms/${roomCode}/players/${pid}/isReady`] = !!player.isHost;
+        });
+    }
+    await update(ref(db), updates);
 }
 
 async function newRound() {
@@ -374,7 +385,9 @@ async function updateImposterCount(count) {
     }
 
     const { roomCode } = multiplayerState;
-    await update(ref(db, `rooms/${roomCode}`), { imposterCount: count });
+    const roomRef = ref(db, `rooms/${roomCode}`);
+    assertNotMidRound(await get(roomRef), 'imposter count');
+    await update(roomRef, { imposterCount: count });
 }
 
 // ===============================================
@@ -564,6 +577,9 @@ async function playAgain(category, secretWord, gameType = 'word', secretQuestion
     if (snapshot.exists()) {
         const players = snapshot.val();
         const playerIds = Object.keys(players);
+        if (playerIds.length < 3) {
+            throw new Error('Need at least 3 players to start.');
+        }
         const imposterCountRef = ref(db, `rooms/${roomCode}/imposterCount`);
         const imposterSnapshot = await get(imposterCountRef);
         const imposterCount = imposterSnapshot.exists() ? imposterSnapshot.val() : 1;
@@ -618,12 +634,23 @@ async function resetForNewGame() {
     }
 }
 
+// Settings may only change between rounds (lobby / results), never while a
+// round is being played or voted on.
+function assertNotMidRound(roomSnap, what) {
+    const status = roomSnap?.exists() ? roomSnap.val().status : null;
+    if (status === 'playing' || status === 'voting') {
+        throw new Error(`Can't change ${what} during an active round.`);
+    }
+}
+
 async function setCategory(category) {
     if (!multiplayerState.isHost) {
         throw new Error('Only the host can set the category.');
     }
     const { roomCode } = multiplayerState;
-    await update(ref(db, `rooms/${roomCode}`), { category });
+    const roomRef = ref(db, `rooms/${roomCode}`);
+    assertNotMidRound(await get(roomRef), 'category');
+    await update(roomRef, { category });
 }
 
 async function setGameType(gameType) {
@@ -633,12 +660,18 @@ async function setGameType(gameType) {
     const { roomCode } = multiplayerState;
     const roomRef = ref(db, `rooms/${roomCode}`);
     const snap = await get(roomRef);
+    assertNotMidRound(snap, 'game mode');
     const updates = { gameType: gameType || 'word' };
-    // When switching to question, default category if current is word category
-    if (gameType === 'question' && snap.exists()) {
+    // Keep category compatible with the selected game type, so the displayed
+    // default is always the real one (a stale 'q:' category in word mode used
+    // to crash word picking at game start).
+    if (snap.exists()) {
         const cat = snap.val().category;
-        if (!cat || !cat.startsWith('q:')) {
+        if (gameType === 'question' && (!cat || !cat.startsWith('q:'))) {
             updates.category = 'q:twistAndTurn';
+        }
+        if (gameType !== 'question' && (!cat || cat.startsWith('q:'))) {
+            updates.category = 'countries';
         }
     }
     await update(roomRef, updates);
