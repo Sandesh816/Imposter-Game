@@ -5,8 +5,8 @@ import * as MP from './multiplayer.js';
 import * as League from './league.js';
 import * as CustomCat from './customCategories.js';
 import * as Auth from './auth.js';
-import * as AIGen from './aiGenerate.js';
-import * as GameEngine from './gameEngine.js';
+import * as FX from './fx.js';
+import * as Voice from './voice.js';
 
 // ===============================================
 // Game State
@@ -24,6 +24,7 @@ const gameState = {
     imposterIndices: [],
     currentRevealIndex: 0,
     isRevealed: false,
+    cardLocked: false, // blocks card taps while handing the phone over
     // Multiplayer state
     roomData: null,
     myPlayerId: null,
@@ -31,11 +32,7 @@ const gameState = {
     mpRevealed: false,
     selectedVote: null,
     chatMessages: [],
-    unreadMessages: 0,
-    // League game state
-    leagueCode: null,
-    isLeagueGame: false,
-    leagueImposterCount: 1
+    unreadMessages: 0
 };
 
 // ===============================================
@@ -62,8 +59,6 @@ const screens = {
     league: document.getElementById('league-screen'),
     leagueJoin: document.getElementById('league-join-screen'),
     leagueDetail: document.getElementById('league-detail-screen'),
-    leaguePlay: document.getElementById('league-play-screen'),
-    leaguePlayers: document.getElementById('league-players-screen'),
     customCat: document.getElementById('custom-cat-screen'),
     customCreate: document.getElementById('custom-create-screen'),
     community: document.getElementById('community-screen'),
@@ -111,6 +106,23 @@ const elements = {
     revealQuestionText: document.getElementById('reveal-question-text'),
     revealAnswerInput: document.getElementById('reveal-answer-input'),
     revealInstruction: document.getElementById('reveal-instruction'),
+    imposterHint: document.getElementById('imposter-hint'),
+
+    // Handoff overlay (Local)
+    handoffOverlay: document.getElementById('handoff-overlay'),
+    handoffLabel: document.getElementById('handoff-label'),
+    handoffAvatar: document.getElementById('handoff-avatar'),
+    handoffName: document.getElementById('handoff-name'),
+    handoffConfirmBtn: document.getElementById('handoff-confirm-btn'),
+    handoffConfirmText: document.getElementById('handoff-confirm-text'),
+
+    // Discussion timer (Local)
+    timerTime: document.getElementById('timer-time'),
+    timerRingProgress: document.getElementById('timer-ring-progress'),
+    timerPresets: document.getElementById('timer-presets'),
+    timerStartBtn: document.getElementById('timer-start-btn'),
+    timerStartText: document.getElementById('timer-start-text'),
+
 
     // Game (Local)
     gameCategory: document.getElementById('game-category'),
@@ -175,26 +187,6 @@ const elements = {
     leagueDetailEmpty: document.getElementById('league-detail-empty'),
     leagueLeaveBtn: document.getElementById('league-leave-btn'),
     leagueDeleteBtn: document.getElementById('league-delete-btn'),
-    leaguePlayBtn: document.getElementById('league-play-btn'),
-
-    // League Play Mode
-    leaguePlayBackBtn: document.getElementById('league-play-back-btn'),
-    leaguePlayTitle: document.getElementById('league-play-title'),
-    leaguePlaySubtitle: document.getElementById('league-play-subtitle'),
-    leagueLocalBtn: document.getElementById('league-local-btn'),
-    leagueMultiplayerBtn: document.getElementById('league-multiplayer-btn'),
-
-    // League Player Select
-    leaguePlayersBackBtn: document.getElementById('league-players-back-btn'),
-    leagueMembersList: document.getElementById('league-members-list'),
-    leagueAddPlayerInput: document.getElementById('league-add-player-input'),
-    leagueAddPlayerBtn: document.getElementById('league-add-player-btn'),
-    leagueImposterMinus: document.getElementById('league-imposter-minus'),
-    leagueImposterPlus: document.getElementById('league-imposter-plus'),
-    leagueImposterCount: document.getElementById('league-imposter-count'),
-    leagueImposterRandom: document.getElementById('league-imposter-random'),
-    leagueSelectedCount: document.getElementById('league-selected-count'),
-    leaguePlayersContinue: document.getElementById('league-players-continue'),
 
     // Multiplayer - Choice
     mpBackToWelcome: document.getElementById('mp-back-to-welcome'),
@@ -248,11 +240,16 @@ const elements = {
     resultsCategoryValue: document.getElementById('results-category-value'),
     resultsChangeCategoryBtn: document.getElementById('results-change-category-btn'),
     resultsPlayersList: document.getElementById('results-players-list'),
-    resultsReadyControls: document.getElementById('results-ready-controls'),
+    resultsReadyStatus: document.getElementById('results-ready-status'),
     mpResultsReadyBtn: document.getElementById('mp-results-ready-btn'),
-    resultsWaiting: document.getElementById('results-waiting'),
+    mpResultsReadyText: document.getElementById('mp-results-ready-text'),
+    mpNewRoundText: document.getElementById('mp-new-round-text'),
     resultsHostControls: document.getElementById('results-host-controls'),
-    resultsHostHint: document.getElementById('results-host-hint'),
+    resultsGameTypeWord: document.getElementById('results-game-type-word'),
+    resultsGameTypeQuestion: document.getElementById('results-game-type-question'),
+    resultsImposterMinus: document.getElementById('results-imposter-minus'),
+    resultsImposterCount: document.getElementById('results-imposter-count'),
+    resultsImposterPlus: document.getElementById('results-imposter-plus'),
     mpResultsAnonymousVoting: document.getElementById('mp-results-anonymous-voting'),
 
     // Multiplayer - Word
@@ -264,9 +261,10 @@ const elements = {
     mpPlayersSeen: document.getElementById('mp-players-seen'),
     mpReadyBtn: document.getElementById('mp-ready-btn'),
     mpReadyBtnText: document.getElementById('mp-ready-btn-text'),
-    mpLeaveGameWord: document.getElementById('mp-leave-game-word'),
-    mpLeaveGameDiscussion: document.getElementById('mp-leave-game-discussion'),
-    mpLeaveGameVoting: document.getElementById('mp-leave-game-voting'),
+    mpAnswerInput: document.getElementById('mp-answer-input'),
+    mpSubmitAnswerBtn: document.getElementById('mp-submit-answer-btn'),
+    mpSubmitAnswerText: document.getElementById('mp-submit-answer-text'),
+    mpAnswerStatus: document.getElementById('mp-answer-status'),
 
     // Multiplayer - Discussion
     mpCategoryDisplay: document.getElementById('mp-category-display'),
@@ -296,6 +294,15 @@ const elements = {
     mpNewRoundBtn: document.getElementById('mp-new-round-btn'),
     mpReturnLobbyBtn: document.getElementById('mp-return-lobby-btn'),
 
+    // Voice chat
+    voiceBar: document.getElementById('voice-bar'),
+    voiceJoinBtn: document.getElementById('voice-join-btn'),
+    voiceJoinText: document.getElementById('voice-join-text'),
+    voiceControls: document.getElementById('voice-controls'),
+    voiceMicBtn: document.getElementById('voice-mic-btn'),
+    voiceParticipants: document.getElementById('voice-participants'),
+    voiceLeaveBtn: document.getElementById('voice-leave-btn'),
+
     // Chat
     chatSidebar: document.getElementById('chat-sidebar'),
     chatOverlay: document.getElementById('chat-overlay'),
@@ -322,9 +329,6 @@ const elements = {
     catNameInput: document.getElementById('cat-name-input'),
     wordInput: document.getElementById('word-input'),
     addWordBtn: document.getElementById('add-word-btn'),
-    aiGenerateBtn: document.getElementById('ai-generate-btn'),
-    aiGenerateMoreBtn: document.getElementById('ai-generate-more-btn'),
-    aiDifficultySelect: document.getElementById('ai-difficulty-select'),
     wordChipList: document.getElementById('word-chip-list'),
     wordCountBadge: document.getElementById('word-count-badge'),
     saveCatBtn: document.getElementById('save-cat-btn'),
@@ -339,11 +343,6 @@ const elements = {
     communityEmpty: document.getElementById('community-empty'),
 
     // Auth / Profile
-    authModal: document.getElementById('auth-modal'),
-    authGuestBtn: document.getElementById('auth-guest-btn'),
-    authLoginBtn: document.getElementById('auth-login-btn'),
-    authSignupBtn: document.getElementById('auth-signup-btn'),
-    authModalError: document.getElementById('auth-modal-error'),
     authAvatarBtn: document.getElementById('auth-avatar-btn'),
     authDisplayName: document.getElementById('auth-display-name'),
     authAvatarEmoji: document.getElementById('auth-avatar-emoji'),
@@ -366,16 +365,50 @@ const elements = {
 // Utility Functions
 // ===============================================
 function shuffleArray(array) {
-    return GameEngine.secureShuffle(array, window.crypto);
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const randomBuffer = new Uint32Array(1);
+        window.crypto.getRandomValues(randomBuffer);
+        const j = Math.floor((randomBuffer[0] / 4294967296) * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
 }
 
 function getRandomInt(min, max) {
-    return GameEngine.getRandomInt(min, max);
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+const USED_WORDS_KEY = 'imposter-used-words';
+
+// Pick a word while avoiding the most recently used ones in this category,
+// so back-to-back rounds don't repeat.
+function pickFreshWord(words, categoryKey) {
+    let used = {};
+    try { used = JSON.parse(localStorage.getItem(USED_WORDS_KEY)) || {}; } catch (e) { /* corrupt storage */ }
+    const recent = Array.isArray(used[categoryKey]) ? used[categoryKey] : [];
+    const fresh = words.filter(w => !recent.includes(w));
+    const pool = fresh.length > 0 ? fresh : words;
+    const word = pool[getRandomInt(0, pool.length - 1)];
+
+    const memory = Math.min(words.length - 1, 12);
+    used[categoryKey] = [word, ...recent.filter(w => w !== word)].slice(0, Math.max(memory, 0));
+    try { localStorage.setItem(USED_WORDS_KEY, JSON.stringify(used)); } catch (e) { /* storage full */ }
+    return word;
 }
 
 function getRandomWord(category) {
-    const localCats = CustomCat.getLocalCategoriesSync();
-    return GameEngine.getRandomWord(category, CATEGORIES, localCats);
+    // Support custom categories (prefixed with 'custom:')
+    if (typeof category === 'string' && category.startsWith('custom:')) {
+        const localCats = CustomCat.getLocalCategoriesSync();
+        const cat = localCats.find(c => 'custom:' + c.id === category);
+        if (cat && cat.words.length > 0) {
+            return pickFreshWord(cat.words, category);
+        }
+        return 'Mystery';
+    }
+    const words = CATEGORIES[category].words;
+    return pickFreshWord(words, category);
 }
 
 function getPlayerAvatars() {
@@ -403,26 +436,6 @@ function showScreen(screenId) {
     }
 }
 
-function showAuthModal() {
-    if (elements.authModal) {
-        elements.authModal.classList.remove('hidden');
-    }
-}
-
-function hideAuthModal() {
-    if (elements.authModal) {
-        elements.authModal.classList.add('hidden');
-    }
-}
-
-function showAuthModalError(msg) {
-    if (elements.authModalError) {
-        elements.authModalError.textContent = msg;
-        elements.authModalError.classList.remove('hidden');
-        setTimeout(() => elements.authModalError.classList.add('hidden'), 5000);
-    }
-}
-
 // ===============================================
 // LOCAL MODE - Player Management
 // ===============================================
@@ -433,6 +446,7 @@ function createPlayerElement(index, name = '') {
     const playerItem = document.createElement('div');
     playerItem.className = 'player-item';
     playerItem.dataset.index = index;
+    playerItem.style.setProperty('--i', index);
 
     playerItem.innerHTML = `
     <div class="player-number">${avatar}</div>
@@ -539,6 +553,7 @@ function updateMPImposterLimits(playerCount) {
 function renderCategories(targetGrid = elements.categoryGrid, callback = selectCategory, gameTypeOverride = null) {
     targetGrid.innerHTML = '';
     const gType = gameTypeOverride ?? gameState.gameType;
+    let cardIndex = 0;
 
     if (gType === 'question') {
         // Question mode: only question categories
@@ -547,6 +562,7 @@ function renderCategories(targetGrid = elements.categoryGrid, callback = selectC
                 const card = document.createElement('div');
                 card.className = 'category-card';
                 card.dataset.category = 'q:' + key;
+                card.style.setProperty('--i', cardIndex++);
                 card.innerHTML = `
           <div class="category-icon">${category.icon}</div>
           <div class="category-name">${category.name}</div>
@@ -566,6 +582,7 @@ function renderCategories(targetGrid = elements.categoryGrid, callback = selectC
         card.className = 'category-card custom-category-card';
         const key = 'custom:' + cat.id;
         card.dataset.category = key;
+        card.style.setProperty('--i', cardIndex++);
         card.innerHTML = `
       <div class="category-icon">${cat.icon || '📝'}</div>
       <div class="category-name">${cat.name}</div>
@@ -580,6 +597,7 @@ function renderCategories(targetGrid = elements.categoryGrid, callback = selectC
         const card = document.createElement('div');
         card.className = 'category-card';
         card.dataset.category = key;
+        card.style.setProperty('--i', cardIndex++);
         card.innerHTML = `
       <div class="category-icon">${category.icon}</div>
       <div class="category-name">${category.name}</div>
@@ -591,6 +609,7 @@ function renderCategories(targetGrid = elements.categoryGrid, callback = selectC
 }
 
 function selectCategory(categoryKey) {
+    FX.play('tap');
     gameState.selectedCategory = categoryKey;
     if (gameState.gameType === 'question' && categoryKey.startsWith('q:')) {
         const qKey = categoryKey.slice(2);
@@ -607,37 +626,38 @@ function selectCategory(categoryKey) {
 // LOCAL MODE - Game Logic
 // ===============================================
 function startLocalGame() {
-    const localCats = CustomCat.getLocalCategoriesSync();
-    const round = GameEngine.createLocalRound({
-        gameType: gameState.gameType,
-        selectedCategory: gameState.selectedCategory,
-        players: gameState.players,
-        imposterCount: gameState.imposterCount,
-        categories: CATEGORIES,
-        questionCategories: typeof QUESTION_CATEGORIES !== 'undefined' ? QUESTION_CATEGORIES : {},
-        customCategories: localCats,
-        getRandomQuestion,
-        cryptoObj: window.crypto
-    });
+    if (gameState.gameType === 'word') {
+        gameState.secretWord = getRandomWord(gameState.selectedCategory);
+        gameState.secretQuestion = null;
+        gameState.playerAnswers = [];
+    } else if (gameState.gameType === 'question' && gameState.selectedCategory?.startsWith('q:')) {
+        const pair = getRandomQuestion(gameState.selectedCategory.slice(2));
+        if (pair) {
+            gameState.secretQuestion = pair;
+            gameState.playerAnswers = new Array(gameState.players.length).fill(null);
+        }
+    }
 
-    gameState.secretWord = round.secretWord;
-    gameState.secretQuestion = round.secretQuestion;
-    gameState.playerAnswers = round.playerAnswers;
-    gameState.imposterIndices = round.imposterIndices;
-    gameState.currentRevealIndex = round.currentRevealIndex;
-    gameState.isRevealed = round.isRevealed;
+    const playerIndices = gameState.players.map((_, index) => index);
+    const shuffledIndices = shuffleArray(playerIndices);
+    gameState.imposterIndices = shuffledIndices.slice(0, gameState.imposterCount);
+
+    gameState.currentRevealIndex = 0;
+    gameState.isRevealed = false;
+    gameState.cardLocked = false;
 
     updateRevealScreen();
     showScreen('reveal');
+    showHandoff(0, true);
 }
 
 function updateRevealScreen() {
     const currentPlayer = gameState.players[gameState.currentRevealIndex];
-    const isImposter = gameState.imposterIndices.includes(gameState.currentRevealIndex);
     const avatars = getPlayerAvatars();
 
     elements.revealCard.classList.remove('revealed');
     gameState.isRevealed = false;
+    clearCardBack();
 
     elements.playerAvatar.textContent = avatars[gameState.currentRevealIndex % avatars.length];
     elements.revealPlayerName.textContent = currentPlayer;
@@ -646,26 +666,13 @@ function updateRevealScreen() {
         elements.revealWordContainer?.classList.add('hidden');
         elements.revealQuestionContainer?.classList.remove('hidden');
         elements.revealInstruction?.classList.add('hidden');
-        const q = isImposter ? gameState.secretQuestion.imposter : gameState.secretQuestion.real;
-        elements.revealQuestionText.textContent = q;
-        elements.revealAnswerInput.value = gameState.playerAnswers[gameState.currentRevealIndex] || '';
         elements.revealAnswerInput.placeholder = 'Type your answer...';
-        elements.nextPlayerBtn.disabled = true;
     } else {
         elements.revealWordContainer?.classList.remove('hidden');
         elements.revealQuestionContainer?.classList.add('hidden');
         elements.revealInstruction?.classList.remove('hidden');
-        if (isImposter) {
-            elements.wordLabel.textContent = "You are the:";
-            elements.secretWord.textContent = "IMPOSTER! 🕵️";
-            elements.secretWord.classList.add('imposter');
-        } else {
-            elements.wordLabel.textContent = "Your word is:";
-            elements.secretWord.textContent = gameState.secretWord;
-            elements.secretWord.classList.remove('imposter');
-        }
-        elements.nextPlayerBtn.disabled = false;
     }
+    elements.nextPlayerBtn.disabled = true;
 
     elements.currentPlayerNum.textContent = gameState.currentRevealIndex + 1;
     elements.totalPlayers.textContent = gameState.players.length;
@@ -677,41 +684,153 @@ function updateRevealScreen() {
     }
 }
 
-function toggleReveal() {
-    // In question mode, once revealed stay revealed (they need to type answer)
-    if (gameState.gameType === 'question' && gameState.isRevealed) return;
-    gameState.isRevealed = !gameState.isRevealed;
-    elements.revealCard.classList.toggle('revealed', gameState.isRevealed);
-    if (gameState.gameType === 'question' && gameState.isRevealed) {
-        setTimeout(() => elements.revealAnswerInput?.focus(), 300);
+// The secret only exists in the DOM while the card is face-up. This (plus the
+// opaque handoff overlay) makes it impossible to glimpse the next player's role.
+function populateCardBack() {
+    const isImposter = gameState.imposterIndices.includes(gameState.currentRevealIndex);
+
+    if (gameState.gameType === 'question') {
+        const q = isImposter ? gameState.secretQuestion.imposter : gameState.secretQuestion.real;
+        elements.revealQuestionText.textContent = q;
+        elements.revealAnswerInput.value = gameState.playerAnswers[gameState.currentRevealIndex] || '';
+        return;
+    }
+
+    if (isImposter) {
+        elements.wordLabel.textContent = "You are the:";
+        elements.secretWord.textContent = "IMPOSTER! 🕵️";
+        elements.secretWord.classList.add('imposter');
+        if (elements.imposterHint) {
+            elements.imposterHint.textContent = `Category: ${getSelectedCategoryName()} — blend in!`;
+            elements.imposterHint.classList.remove('hidden');
+        }
+    } else {
+        elements.wordLabel.textContent = "Your word is:";
+        elements.secretWord.textContent = gameState.secretWord;
+        elements.secretWord.classList.remove('imposter');
+        elements.imposterHint?.classList.add('hidden');
     }
 }
 
+function clearCardBack() {
+    elements.secretWord.textContent = '•••••';
+    elements.secretWord.classList.remove('imposter');
+    elements.wordLabel.textContent = 'Your word is:';
+    elements.imposterHint?.classList.add('hidden');
+    if (elements.revealQuestionText) elements.revealQuestionText.textContent = '';
+    if (elements.revealAnswerInput) elements.revealAnswerInput.value = '';
+}
+
+function updateNextPlayerBtnState() {
+    if (!gameState.isRevealed) {
+        elements.nextPlayerBtn.disabled = true;
+        return;
+    }
+    if (gameState.gameType === 'question') {
+        elements.nextPlayerBtn.disabled = !elements.revealAnswerInput?.value?.trim();
+    } else {
+        elements.nextPlayerBtn.disabled = false;
+    }
+}
+
+function toggleReveal() {
+    if (gameState.cardLocked) return;
+    // In question mode, once revealed stay revealed (they need to type answer)
+    if (gameState.gameType === 'question' && gameState.isRevealed) return;
+
+    gameState.isRevealed = !gameState.isRevealed;
+    FX.play('flip');
+    FX.vibrate(15);
+
+    if (gameState.isRevealed) {
+        populateCardBack();
+        elements.revealCard.classList.add('revealed');
+        if (gameState.gameType === 'question') {
+            setTimeout(() => elements.revealAnswerInput?.focus(), 300);
+        }
+    } else {
+        elements.revealCard.classList.remove('revealed');
+        // Wipe the secret once the flip-back animation has finished
+        setTimeout(() => {
+            if (!gameState.isRevealed) clearCardBack();
+        }, 600);
+    }
+    updateNextPlayerBtnState();
+}
+
+// ---- Pass-the-phone handoff overlay ----
+function showHandoff(index, isFirst = false) {
+    const name = gameState.players[index];
+    const avatars = getPlayerAvatars();
+
+    elements.handoffLabel.textContent = isFirst ? 'Hand the phone to' : 'Pass the phone to';
+    elements.handoffAvatar.textContent = avatars[index % avatars.length];
+    elements.handoffName.textContent = name;
+    elements.handoffConfirmText.textContent = `I'm ${name} — show my card`;
+
+    elements.handoffOverlay.classList.remove('hidden');
+    requestAnimationFrame(() => elements.handoffOverlay.classList.add('visible'));
+}
+
+function hideHandoff() {
+    elements.handoffOverlay.classList.remove('visible');
+    setTimeout(() => elements.handoffOverlay.classList.add('hidden'), 350);
+}
+
+function confirmHandoff() {
+    FX.play('tap');
+    FX.vibrate(10);
+    hideHandoff();
+}
+
 function nextPlayer() {
-    if (!gameState.isRevealed) return;
+    if (!gameState.isRevealed || gameState.cardLocked) return;
 
     // Question mode: save answer before advancing
     if (gameState.gameType === 'question') {
         const ans = elements.revealAnswerInput?.value?.trim();
         if (!ans) return;
         gameState.playerAnswers[gameState.currentRevealIndex] = ans;
+        elements.revealAnswerInput.blur();
     }
 
-    elements.revealCard.classList.remove('revealed');
-    gameState.isRevealed = false;
+    FX.play('whoosh');
+    gameState.cardLocked = true;
+    elements.nextPlayerBtn.disabled = true;
+
+    const isLast = gameState.currentRevealIndex >= gameState.players.length - 1;
+
+    if (isLast) {
+        elements.revealCard.classList.remove('revealed');
+        gameState.isRevealed = false;
+        setTimeout(() => {
+            clearCardBack();
+            gameState.cardLocked = false;
+            showGameScreen();
+        }, 450);
+        return;
+    }
+
+    // Cover the screen with the opaque handoff overlay first, THEN swap the
+    // card content behind it with the flip transition disabled. The next
+    // player's secret is never visible, not even for a frame.
+    gameState.currentRevealIndex++;
+    showHandoff(gameState.currentRevealIndex);
 
     setTimeout(() => {
-        if (gameState.currentRevealIndex < gameState.players.length - 1) {
-            gameState.currentRevealIndex++;
-            updateRevealScreen();
-        } else {
-            showGameScreen();
-        }
-    }, 650);
+        elements.revealCard.classList.add('no-flip');
+        updateRevealScreen();
+        void elements.revealCard.offsetWidth; // flush styles before re-enabling transitions
+        elements.revealCard.classList.remove('no-flip');
+        gameState.cardLocked = false;
+    }, 400);
 }
 
 function getSelectedCategoryName() {
     const key = gameState.selectedCategory;
+    if (typeof key === 'string' && key.startsWith('q:')) {
+        return (typeof QUESTION_CATEGORIES !== 'undefined' && QUESTION_CATEGORIES[key.slice(2)]?.name) || key;
+    }
     if (typeof key === 'string' && key.startsWith('custom:')) {
         const localCats = CustomCat.getLocalCategoriesSync();
         const cat = localCats.find(c => 'custom:' + c.id === key);
@@ -734,6 +853,7 @@ function showGameScreen() {
     gameState.players.forEach((player, index) => {
         const card = document.createElement('div');
         card.className = 'game-player-card';
+        card.style.setProperty('--i', index);
         card.innerHTML = `
       <div class="game-player-avatar">${avatars[index % avatars.length]}</div>
       <div class="game-player-name">${player}</div>
@@ -741,40 +861,112 @@ function showGameScreen() {
         elements.gamePlayersGrid.appendChild(card);
     });
 
-    const localSpeakingOrder = document.getElementById('local-speaking-order');
-    const localQuestionAnswers = document.getElementById('local-question-answers');
-    const localRealQuestion = document.getElementById('local-real-question');
-    const localAnswersList = document.getElementById('local-answers-list');
-
-    if (gameState.gameType === 'question' && gameState.secretQuestion) {
-        localSpeakingOrder?.classList.add('hidden');
-        localQuestionAnswers?.classList.remove('hidden');
-        localRealQuestion.textContent = gameState.secretQuestion.real;
-        localAnswersList.innerHTML = '';
-        gameState.players.forEach((player, idx) => {
-            const item = document.createElement('div');
-            item.className = 'modal-answer-item';
-            const ans = gameState.playerAnswers[idx] || '(no answer)';
-            const playerSpan = document.createElement('span');
-            playerSpan.className = 'answer-player';
-            playerSpan.textContent = `${avatars[idx % avatars.length]} ${player}`;
-            const ansSpan = document.createElement('span');
-            ansSpan.className = 'answer-text';
-            ansSpan.textContent = `"${ans}"`;
-            item.appendChild(playerSpan);
-            item.appendChild(ansSpan);
-            localAnswersList.appendChild(item);
-        });
-        elements.revealAnswerBtn.querySelector('span').textContent = 'Vote';
-    } else {
-        localSpeakingOrder?.classList.remove('hidden');
-        localQuestionAnswers?.classList.add('hidden');
-        const randomIndex = Math.floor(Math.random() * gameState.players.length);
-        elements.firstSpeaker.textContent = gameState.players[randomIndex];
-        elements.revealAnswerBtn.querySelector('span').textContent = 'Reveal Answer';
+    // Question mode: show the question and everyone's submitted answer for review
+    const qaBlock = document.getElementById('game-question-answers');
+    if (qaBlock) {
+        if (gameState.gameType === 'question' && gameState.secretQuestion) {
+            document.getElementById('game-real-question').textContent = gameState.secretQuestion.real;
+            const list = document.getElementById('game-answers-list');
+            list.innerHTML = '';
+            gameState.players.forEach((player, idx) => {
+                const item = document.createElement('div');
+                item.className = 'modal-answer-item';
+                const playerSpan = document.createElement('span');
+                playerSpan.className = 'answer-player';
+                playerSpan.textContent = `${avatars[idx % avatars.length]} ${player}`;
+                const ansSpan = document.createElement('span');
+                ansSpan.className = 'answer-text';
+                ansSpan.textContent = `"${gameState.playerAnswers[idx] || '(no answer)'}"`;
+                item.appendChild(playerSpan);
+                item.appendChild(ansSpan);
+                list.appendChild(item);
+            });
+            qaBlock.classList.remove('hidden');
+        } else {
+            qaBlock.classList.add('hidden');
+        }
     }
 
+    // Shuffled speaking order
+    const order = shuffleArray(gameState.players.map((_, i) => i));
+    elements.firstSpeaker.innerHTML = '';
+    order.forEach((playerIdx, pos) => {
+        const chip = document.createElement('span');
+        chip.className = `speaker-chip ${pos === 0 ? 'first' : ''}`;
+        chip.textContent = `${pos + 1}. ${avatars[playerIdx % avatars.length]} ${gameState.players[playerIdx]}`;
+        elements.firstSpeaker.appendChild(chip);
+    });
+
+    resetDiscussionTimer();
     showScreen('game');
+}
+
+// ===============================================
+// LOCAL MODE - Discussion Timer
+// ===============================================
+const TIMER_RING_CIRCUMFERENCE = 2 * Math.PI * 54;
+let timerTotalSecs = 120;
+let timerRemaining = 120;
+let timerInterval = null;
+
+function formatTime(secs) {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function renderTimer() {
+    if (!elements.timerTime) return;
+    elements.timerTime.textContent = formatTime(timerRemaining);
+    const progress = timerTotalSecs > 0 ? timerRemaining / timerTotalSecs : 0;
+    elements.timerRingProgress.style.strokeDashoffset = TIMER_RING_CIRCUMFERENCE * (1 - progress);
+    elements.timerRingProgress.classList.toggle('urgent', timerRemaining <= 10 && timerInterval !== null);
+    elements.timerTime.classList.toggle('urgent', timerRemaining <= 10 && timerInterval !== null);
+}
+
+function setTimerDuration(secs) {
+    timerTotalSecs = secs;
+    timerRemaining = secs;
+    stopTimerInterval();
+    if (elements.timerStartText) elements.timerStartText.textContent = '▶ Start Timer';
+    renderTimer();
+}
+
+function stopTimerInterval() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+
+function resetDiscussionTimer() {
+    setTimerDuration(timerTotalSecs);
+}
+
+function toggleDiscussionTimer() {
+    FX.play('tap');
+    if (timerInterval) {
+        stopTimerInterval();
+        if (elements.timerStartText) elements.timerStartText.textContent = '▶ Resume';
+        renderTimer();
+        return;
+    }
+    if (timerRemaining <= 0) timerRemaining = timerTotalSecs;
+    if (elements.timerStartText) elements.timerStartText.textContent = '⏸ Pause';
+
+    timerInterval = setInterval(() => {
+        timerRemaining--;
+        if (timerRemaining > 0 && timerRemaining <= 5) FX.play('tick');
+        if (timerRemaining <= 0) {
+            timerRemaining = 0;
+            stopTimerInterval();
+            FX.play('timeUp');
+            FX.vibrate([180, 80, 180]);
+            if (elements.timerStartText) elements.timerStartText.textContent = "🗳️ Time's up!";
+        }
+        renderTimer();
+    }, 1000);
+    renderTimer();
 }
 
 // ===============================================
@@ -784,6 +976,9 @@ let modalVotedPlayers = [];
 let imposterGuesses = {};
 
 function revealAnswer() {
+    stopTimerInterval();
+    FX.play('tap');
+
     // Reset modal state
     modalVotedPlayers = [];
     imposterGuesses = {};
@@ -827,6 +1022,7 @@ function revealAnswer() {
         const card = document.createElement('div');
         card.className = 'vote-player-card';
         card.dataset.index = index;
+        card.style.setProperty('--i', index);
         card.innerHTML = `
             <div class="vote-player-avatar">${avatars[index % avatars.length]}</div>
             <div class="vote-player-name">${player}</div>
@@ -949,11 +1145,17 @@ function finalizeLeaguePoints() {
     // Show step 3: results
     showModalStep('results');
 
-    // Header
+    // Header + celebration
     if (imposterWins) {
         elements.modalResultsTitle.textContent = '🕵️ Imposter Wins!';
+        FX.play('sting');
+        FX.vibrate([60, 40, 120]);
+        FX.imposterConfetti();
     } else {
         elements.modalResultsTitle.textContent = '🎉 Crew Wins!';
+        FX.play('fanfare');
+        FX.vibrate([30, 30, 30, 30, 80]);
+        FX.confetti();
     }
 
     // Secret word or question
@@ -977,15 +1179,6 @@ function finalizeLeaguePoints() {
         tag.innerHTML = `🕵️ ${gameState.players[index]}`;
         elements.impostersList.appendChild(tag);
     });
-
-    // Show imposter question in question mode
-    const imposterQuestionSection = document.getElementById('modal-imposter-question-section');
-    if (gameState.gameType === 'question' && gameState.secretQuestion?.imposter) {
-        imposterQuestionSection.classList.remove('hidden');
-        document.getElementById('modal-imposter-question-text').textContent = gameState.secretQuestion.imposter;
-    } else {
-        imposterQuestionSection.classList.add('hidden');
-    }
 
     // Guess results
     elements.guessResultsSection.innerHTML = '';
@@ -1040,15 +1233,13 @@ function closeModal() {
 }
 
 function newRound() {
+    FX.play('tap');
     startLocalGame();
 }
 
 function restartGame() {
-    if (gameState.isLeagueGame) {
-        showScreen('leaguePlayers');
-    } else {
-        showScreen('players');
-    }
+    stopTimerInterval();
+    showScreen('players');
 }
 
 // Store current round data for save
@@ -1061,18 +1252,8 @@ async function buildLeagueSelector(pointsMap, correctVote, imposterSet) {
     currentRoundCorrectVote = correctVote;
     currentRoundImposterSet = imposterSet;
 
-    elements.leagueCheckboxList.innerHTML = '';
-
-    if (gameState.isLeagueGame && gameState.leagueCode) {
-        elements.leagueSelectorHint.classList.add('hidden');
-        const autoLabel = document.createElement('div');
-        autoLabel.className = 'league-auto-save-label';
-        autoLabel.textContent = `Points will be saved to 🏆 ${leagueGameName}`;
-        elements.leagueCheckboxList.appendChild(autoLabel);
-        return;
-    }
-
     const leagues = await League.getJoinedLeagues();
+    elements.leagueCheckboxList.innerHTML = '';
 
     if (leagues.length === 0) {
         elements.leagueSelectorHint.classList.remove('hidden');
@@ -1085,6 +1266,7 @@ async function buildLeagueSelector(pointsMap, correctVote, imposterSet) {
         const members = await League.getLeagueMembers(league.code);
         const gamePlayers = gameState.players.map(p => p.trim().toLowerCase());
 
+        // Check if all league members are present in the current game
         const missingMembers = members.filter(m => !gamePlayers.includes(m.toLowerCase()));
         const allPresent = members.length === 0 || missingMembers.length === 0;
 
@@ -1100,32 +1282,25 @@ async function buildLeagueSelector(pointsMap, correctVote, imposterSet) {
     });
 }
 
-async function saveLeaguePoints(leagueCode) {
-    if (!currentRoundPointsMap) return;
-    for (let idx = 0; idx < gameState.players.length; idx++) {
-        const entry = currentRoundPointsMap[idx];
-        const name = gameState.players[idx];
-        if (entry.points > 0) {
-            const isWin = currentRoundCorrectVote
-                ? !currentRoundImposterSet.has(idx)
-                : currentRoundImposterSet.has(idx);
-            await League.addPoints(leagueCode, name, entry.points, isWin);
-        } else {
-            await League.recordGame(leagueCode, name);
-        }
-    }
-}
-
 async function savePointsAndClose() {
-    if (gameState.isLeagueGame && gameState.leagueCode) {
-        await saveLeaguePoints(gameState.leagueCode);
-    } else {
-        const checkboxes = elements.leagueCheckboxList.querySelectorAll('input[type=checkbox]:checked');
-        const leagueCodes = Array.from(checkboxes).map(cb => cb.value);
+    // Get checked leagues
+    const checkboxes = elements.leagueCheckboxList.querySelectorAll('input[type=checkbox]:checked');
+    const leagueCodes = Array.from(checkboxes).map(cb => cb.value);
 
-        if (leagueCodes.length > 0 && currentRoundPointsMap) {
-            for (const code of leagueCodes) {
-                await saveLeaguePoints(code);
+    if (leagueCodes.length > 0 && currentRoundPointsMap) {
+        // Save points to each selected league
+        for (const code of leagueCodes) {
+            for (let idx = 0; idx < gameState.players.length; idx++) {
+                const entry = currentRoundPointsMap[idx];
+                const name = gameState.players[idx];
+                if (entry.points > 0) {
+                    const isWin = currentRoundCorrectVote
+                        ? !currentRoundImposterSet.has(idx)
+                        : currentRoundImposterSet.has(idx);
+                    await League.addPoints(code, name, entry.points, isWin);
+                } else {
+                    await League.recordGame(code, name);
+                }
             }
         }
     }
@@ -1140,7 +1315,6 @@ async function savePointsAndClose() {
 let currentLeagueCode = null;
 
 async function showLeagueHub() {
-    clearLeagueGameState();
     showScreen('league');
     await renderLeagueHub();
 }
@@ -1325,141 +1499,6 @@ async function leagueDeleteConfirm() {
 }
 
 // ===============================================
-// LEAGUE GAME MODE
-// ===============================================
-let leagueGameName = '';
-let leagueExtraPlayers = [];
-
-async function showLeaguePlayScreen(code) {
-    gameState.leagueCode = code || currentLeagueCode;
-    gameState.isLeagueGame = true;
-    leagueExtraPlayers = [];
-
-    const detail = await League.getLeagueDetail(gameState.leagueCode);
-    if (detail) {
-        leagueGameName = detail.name;
-        elements.leaguePlayTitle.textContent = `🏆 ${detail.name}`;
-    }
-    showScreen('leaguePlay');
-}
-
-async function startLeagueLocal() {
-    gameState.mode = 'local';
-    gameState.leagueImposterCount = 1;
-    leagueExtraPlayers = [];
-
-    const members = await League.getLeagueMembers(gameState.leagueCode);
-    renderLeaguePlayers(members);
-    showScreen('leaguePlayers');
-}
-
-function startLeagueMultiplayer() {
-    gameState.mode = 'multiplayer';
-    showScreen('mpChoice');
-}
-
-function renderLeaguePlayers(members) {
-    elements.leagueMembersList.innerHTML = '';
-    const allPlayers = [...members, ...leagueExtraPlayers];
-
-    if (allPlayers.length === 0) {
-        elements.leagueMembersList.innerHTML = '<p class="league-players-hint">No members yet. Add players below.</p>';
-    }
-
-    allPlayers.forEach((name, idx) => {
-        const item = document.createElement('div');
-        item.className = 'league-member-item';
-        item.dataset.name = name;
-
-        const isExisting = idx < members.length;
-        item.innerHTML = `
-            <div class="member-checkbox"></div>
-            <span class="member-name">${name}</span>
-            ${isExisting ? `<span class="member-badge">Member</span>` : `<span class="member-badge" style="color: var(--text-muted);">New</span>`}
-        `;
-
-        item.addEventListener('click', () => {
-            item.classList.toggle('selected');
-            const check = item.querySelector('.member-checkbox');
-            check.textContent = item.classList.contains('selected') ? '✓' : '';
-            updateLeaguePlayerCount();
-        });
-
-        elements.leagueMembersList.appendChild(item);
-    });
-
-    updateLeaguePlayerCount();
-    elements.leagueImposterCount.textContent = gameState.leagueImposterCount;
-}
-
-function addLeaguePlayer() {
-    const name = elements.leagueAddPlayerInput.value.trim();
-    if (!name) return;
-
-    const existing = elements.leagueMembersList.querySelectorAll('.league-member-item');
-    for (const item of existing) {
-        if (item.dataset.name.toLowerCase() === name.toLowerCase()) {
-            elements.leagueAddPlayerInput.value = '';
-            return;
-        }
-    }
-
-    leagueExtraPlayers.push(name);
-    elements.leagueAddPlayerInput.value = '';
-
-    const item = document.createElement('div');
-    item.className = 'league-member-item selected';
-    item.dataset.name = name;
-    item.innerHTML = `
-        <div class="member-checkbox">✓</div>
-        <span class="member-name">${name}</span>
-        <span class="member-badge" style="color: var(--text-muted);">New</span>
-    `;
-
-    item.addEventListener('click', () => {
-        item.classList.toggle('selected');
-        const check = item.querySelector('.member-checkbox');
-        check.textContent = item.classList.contains('selected') ? '✓' : '';
-        updateLeaguePlayerCount();
-    });
-
-    elements.leagueMembersList.appendChild(item);
-    updateLeaguePlayerCount();
-}
-
-function updateLeaguePlayerCount() {
-    const selected = elements.leagueMembersList.querySelectorAll('.league-member-item.selected');
-    const count = selected.length;
-    elements.leagueSelectedCount.textContent = count;
-    elements.leaguePlayersContinue.disabled = count < 3;
-
-    const maxImposters = Math.max(1, Math.floor((count - 1) / 2));
-    if (gameState.leagueImposterCount > maxImposters) {
-        gameState.leagueImposterCount = maxImposters;
-        elements.leagueImposterCount.textContent = gameState.leagueImposterCount;
-    }
-    elements.leagueImposterMinus.disabled = gameState.leagueImposterCount <= 1;
-    elements.leagueImposterPlus.disabled = gameState.leagueImposterCount >= maxImposters || count < 3;
-}
-
-function confirmLeaguePlayers() {
-    const selected = elements.leagueMembersList.querySelectorAll('.league-member-item.selected');
-    gameState.players = Array.from(selected).map(item => item.dataset.name);
-    gameState.imposterCount = gameState.leagueImposterCount;
-    showScreen('gameType');
-}
-
-function clearLeagueGameState() {
-    gameState.leagueCode = null;
-    gameState.isLeagueGame = false;
-    gameState.leagueImposterCount = 1;
-    leagueGameName = '';
-    leagueExtraPlayers = [];
-    const mpSaved = document.getElementById('mp-league-saved');
-    if (mpSaved) mpSaved.remove();
-}
-
-// ===============================================
 // MULTIPLAYER MODE - Room Management
 // ===============================================
 async function createRoom() {
@@ -1484,7 +1523,7 @@ async function createRoom() {
         showScreen('mpLobby');
     } catch (error) {
         hideLoading();
-        showAlert('Failed to create room: ' + error.message);
+        alert('Failed to create room: ' + error.message);
     }
 }
 
@@ -1525,13 +1564,33 @@ async function joinRoom() {
     }
 }
 
+// Leaving a room discards room/round state, so always confirm. The host
+// closing the room ends it for everyone — warn accordingly.
+function confirmLeaveRoom() {
+    const status = gameState.roomData?.status;
+    const midRound = status === 'playing' || status === 'voting';
+    let msg;
+    if (MP.isHost()) {
+        msg = midRound
+            ? 'Leave and close the room? The current round will end for everyone.'
+            : 'Leave and close the room for everyone?';
+    } else {
+        msg = midRound
+            ? 'Leave mid-round? You won\'t be able to rejoin until the next game.'
+            : 'Leave the room?';
+    }
+    if (confirm(msg)) leaveRoom();
+}
+
 async function leaveRoom() {
     showLoading('Leaving room...');
     try {
+        await leaveVoiceChat();
         await MP.leaveRoom();
     } catch (e) {
         console.error('Error leaving room:', e);
     }
+    hideVoiceBar();
     hideLoading();
     gameState.roomData = null;
     gameState.myPlayerId = null;
@@ -1556,13 +1615,16 @@ function copyRoomCode() {
 function handleRoomUpdate(data) {
     if (!data) {
         // Room was deleted
+        leaveVoiceChat();
+        hideVoiceBar();
+        alert('The host has closed the room.');
         gameState.roomData = null;
         showScreen('welcome');
-        showAlert('The host has closed the room.');
         return;
     }
 
     gameState.roomData = data;
+    showVoiceBar();
     const isHost = MP.isHost();
     const players = data.players || {};
     const playerCount = Object.keys(players).length;
@@ -1599,12 +1661,14 @@ function handleRoomUpdate(data) {
             checkAllVoted(data);
             break;
 
-        case 'results':
-            updateResultsScreen(data);
-            if (!screens.mpResults.classList.contains('active')) {
-                showScreen('mpResults');
-            }
+        case 'results': {
+            // Always re-render so ready states / settings stay live,
+            // but only celebrate on the first transition to results.
+            const firstShow = !screens.mpResults.classList.contains('active');
+            updateResultsScreen(data, firstShow);
+            if (firstShow) showScreen('mpResults');
             break;
+        }
     }
 }
 
@@ -1614,7 +1678,9 @@ function updateLobbyUI(data, isHost, players, playerCount) {
 
     // Calculate ready count
     const readyCount = Object.values(players).filter(p => p.isReady).length;
-    const hasPlayedBefore = data.lastCategory !== null;
+    // RTDB drops null keys, so a fresh room has lastCategory === undefined;
+    // use a loose check or new rooms would wrongly show the post-game controls
+    const hasPlayedBefore = data.lastCategory != null;
 
     // Update players list
     elements.lobbyPlayersList.innerHTML = '';
@@ -1629,7 +1695,7 @@ function updateLobbyUI(data, isHost, players, playerCount) {
             <div class="lobby-player-avatar">${avatars[index % avatars.length]}</div>
             <div class="lobby-player-name">${player.name}${isYou ? ' (You)' : ''}</div>
             ${player.isHost ? '<span class="lobby-player-badge">Host</span>' : ''}
-            ${player.isReady && hasPlayedBefore ? '<span class="lobby-player-badge ready-badge">Ready</span>' : ''}
+            ${!player.isHost && player.isReady ? '<span class="lobby-player-badge ready-badge">Ready ✓</span>' : ''}
             <div class="lobby-player-status ${player.isConnected ? '' : 'disconnected'}"></div>
         `;
         elements.lobbyPlayersList.appendChild(div);
@@ -1712,10 +1778,12 @@ function updateLobbyUI(data, isHost, players, playerCount) {
         const myPlayer = players[gameState.myPlayerId];
         if (myPlayer?.isReady) {
             elements.mpLobbyReadyBtn.classList.add('btn-ready-confirmed');
-            elements.mpLobbyReadyText.textContent = "Ready!";
+            elements.mpLobbyReadyText.textContent = "You're ready ✓";
+            elements.mpLobbyReadyBtn.title = 'Tap to undo';
         } else {
             elements.mpLobbyReadyBtn.classList.remove('btn-ready-confirmed');
-            elements.mpLobbyReadyText.textContent = "I'm Ready";
+            elements.mpLobbyReadyText.textContent = "I'm ready";
+            elements.mpLobbyReadyBtn.title = '';
         }
     }
 }
@@ -1723,6 +1791,17 @@ function updateLobbyUI(data, isHost, players, playerCount) {
 // ===============================================
 // MULTIPLAYER MODE - Category Selection
 // ===============================================
+// Always resolve to a category that's valid for the game type. A stale
+// mismatch (e.g. a leftover 'q:' category in word mode) used to make the
+// UI show "Countries" while the real category was unusable, crashing the
+// word picker at game start.
+function resolveMPCategory(gameType, category) {
+    if (gameType === 'question') {
+        return category && category.startsWith('q:') ? category : 'q:twistAndTurn';
+    }
+    return category && !category.startsWith('q:') ? category : 'countries';
+}
+
 function selectMPCategory(categoryKey) {
     showLoading('Updating category...');
     MP.setCategory(categoryKey)
@@ -1732,7 +1811,7 @@ function selectMPCategory(categoryKey) {
         })
         .catch(err => {
             hideLoading();
-            showAlert('Failed to update category: ' + err.message);
+            alert('Failed to update category: ' + err.message);
         });
 }
 
@@ -1764,9 +1843,10 @@ function updateWordScreen(data) {
         document.getElementById('mp-reveal-instruction')?.classList.add('hidden');
         const q = myPlayer.isImposter ? data.secretQuestion.imposter : data.secretQuestion.real;
         document.getElementById('mp-question-text').textContent = q;
-        document.getElementById('mp-answer-input').value = myPlayer.answer || '';
+        elements.mpAnswerInput.value = myPlayer.answer || '';
+        renderMPAnswerState(!!myPlayer.answer);
         mpReadyBtn?.classList.add('hidden');
-        mpWordStatus?.classList.add('hidden');
+        mpWordStatus?.classList.remove('hidden'); // shows "x of y have answered"
     } else {
         mpWordContainer?.classList.remove('hidden');
         mpQuestionContainer?.classList.add('hidden');
@@ -1779,31 +1859,93 @@ function updateWordScreen(data) {
         mpReadyBtn?.classList.remove('hidden');
         mpWordStatus?.classList.remove('hidden');
 
+        const mpImposterHint = document.getElementById('mp-imposter-hint');
         if (myPlayer.isImposter) {
             elements.mpWordLabel.textContent = "You are the:";
             elements.mpSecretWord.textContent = "IMPOSTER! 🕵️";
             elements.mpSecretWord.classList.add('imposter');
+            if (mpImposterHint) {
+                const catName = CATEGORIES[data.category]?.name || data.category || '';
+                mpImposterHint.textContent = catName ? `Category: ${catName} — blend in!` : 'Blend in!';
+                mpImposterHint.classList.remove('hidden');
+            }
         } else {
             elements.mpWordLabel.textContent = "Your word is:";
             elements.mpSecretWord.textContent = data.secretWord;
             elements.mpSecretWord.classList.remove('imposter');
+            mpImposterHint?.classList.add('hidden');
         }
+    }
+}
+
+// ---- Question-mode answer submission (Twist & Turn) ----
+let mpAnswerSubmitting = false;
+
+// Renders the persistent submission state (idle vs submitted). The transient
+// "Submitting…" state is handled inside submitMPAnswer itself.
+function renderMPAnswerState(submitted) {
+    if (!elements.mpSubmitAnswerBtn) return;
+    if (submitted) {
+        elements.mpSubmitAnswerBtn.disabled = true;
+        elements.mpSubmitAnswerBtn.classList.add('btn-ready-confirmed');
+        elements.mpSubmitAnswerText.textContent = 'Submitted ✓';
+        elements.mpAnswerInput.disabled = true;
+        elements.mpAnswerStatus.textContent = 'Your answer is locked in — waiting for the others.';
+        elements.mpAnswerStatus.className = 'mp-answer-status success';
+    } else {
+        elements.mpSubmitAnswerBtn.classList.remove('btn-ready-confirmed');
+        elements.mpSubmitAnswerText.textContent = 'Submit Answer';
+        elements.mpAnswerInput.disabled = false;
+        elements.mpSubmitAnswerBtn.disabled = !elements.mpAnswerInput.value.trim();
+        elements.mpAnswerStatus.className = 'mp-answer-status hidden';
+    }
+}
+
+async function submitMPAnswer() {
+    const ans = elements.mpAnswerInput?.value?.trim();
+    const me = gameState.roomData?.players?.[gameState.myPlayerId];
+    if (!ans || mpAnswerSubmitting || me?.answer) return; // no blank/duplicate submissions
+
+    mpAnswerSubmitting = true;
+    elements.mpSubmitAnswerBtn.disabled = true;
+    elements.mpAnswerInput.disabled = true;
+    elements.mpSubmitAnswerText.textContent = 'Submitting…';
+    elements.mpAnswerStatus.className = 'mp-answer-status hidden';
+
+    try {
+        await MP.submitAnswer(ans);
+        FX.play('chime');
+        FX.vibrate(20);
+        renderMPAnswerState(true);
+    } catch (e) {
+        console.error('Submit answer failed', e);
+        renderMPAnswerState(false);
+        elements.mpAnswerStatus.textContent = "Couldn't submit — check your connection and try again.";
+        elements.mpAnswerStatus.className = 'mp-answer-status error';
+    } finally {
+        mpAnswerSubmitting = false;
     }
 }
 
 function updateWordScreenStatus(data) {
     const gameType = data.gameType || 'word';
-    if (gameType === 'question') return; // Handled by submit button
-
-    const players = data.players;
+    const players = data.players || {};
     const total = Object.keys(players).length;
+    const myPlayer = players[gameState.myPlayerId];
+
+    if (gameType === 'question') {
+        const answered = Object.values(players).filter(p => p.answer).length;
+        elements.mpPlayersSeen.textContent = `${answered} of ${total} have answered.`;
+        // Server state is the source of truth (covers refresh/reconnect)
+        if (myPlayer?.answer && !mpAnswerSubmitting) renderMPAnswerState(true);
+        return;
+    }
+
     const seen = Object.values(players).filter(p => p.hasSeenWord).length;
     const ready = Object.values(players).filter(p => p.isReady).length;
 
     elements.mpPlayersSeen.textContent = `${seen} of ${total} have seen their word. ${ready} ready.`;
-
-    const myPlayer = players[gameState.myPlayerId];
-    elements.mpReadyBtn.disabled = !myPlayer.hasSeenWord;
+    elements.mpReadyBtn.disabled = !myPlayer?.hasSeenWord;
 }
 
 function toggleMPReveal() {
@@ -1815,21 +1957,17 @@ function toggleMPReveal() {
         return;
     }
     gameState.mpRevealed = !gameState.mpRevealed;
+    FX.play('flip');
+    FX.vibrate(15);
     elements.mpRevealCard.classList.toggle('revealed', gameState.mpRevealed);
     if (gameState.mpRevealed) MP.markWordSeen();
 }
 
 async function markReady() {
     await MP.markReady();
-    const playerCount = Object.keys(gameState.roomData?.players || {}).length;
-    if (playerCount < 3) {
-        elements.mpReadyBtn.classList.remove('btn-ready-confirmed');
-        elements.mpReadyBtnText.textContent = 'Too few players';
-        elements.mpReadyBtn.disabled = true;
-        return;
-    }
+    // Update button to show ready state
     elements.mpReadyBtn.classList.add('btn-ready-confirmed');
-    elements.mpReadyBtnText.textContent = 'Waiting for others...';
+    elements.mpReadyBtnText.textContent = "You're ready ✓ — waiting for others";
     elements.mpReadyBtn.disabled = true;
 }
 
@@ -1837,19 +1975,11 @@ function checkAllReady(data) {
     const gameType = data.gameType || 'word';
     const players = Object.values(data.players);
 
-    if (players.length < 3) {
-        elements.mpReadyBtn?.classList.remove('btn-ready-confirmed');
-        if (elements.mpReadyBtnText) elements.mpReadyBtnText.textContent = 'Too few players';
-        if (elements.mpReadyBtn) elements.mpReadyBtn.disabled = true;
-        elements.mpPlayersSeen.textContent = `Need at least 3 players to play. Only ${players.length} in the room.`;
-        return;
-    }
-
     const allReady = gameType === 'question'
-        ? players.every(p => p.hasSeenWord && p.answer)
+        ? players.every(p => p.hasSeenWord && p.answer) // All submitted answers
         : players.every(p => p.isReady);
 
-    if (allReady) {
+    if (allReady && players.length >= 3) {
         updateDiscussionScreen(data);
         showScreen('mpDiscussion');
     }
@@ -1982,7 +2112,7 @@ async function startVoting() {
         hideLoading();
     } catch (err) {
         hideLoading();
-        showAlert('Failed to start voting: ' + err.message);
+        alert('Failed to start voting: ' + err.message);
     }
 }
 
@@ -2126,7 +2256,7 @@ function checkAllVoted(data) {
 // ===============================================
 // MULTIPLAYER MODE - Results Screen
 // ===============================================
-async function updateResultsScreen(data) {
+function updateResultsScreen(data, celebrate = false) {
     const results = MP.calculateVoteResults(data.players);
     const avatars = getPlayerAvatars();
 
@@ -2139,6 +2269,19 @@ async function updateResultsScreen(data) {
         elements.resultsHeader.className = 'results-header crew-wins';
         elements.resultsTitle.textContent = '🎉 Crew Wins!';
         elements.resultsSubtitle.textContent = 'The imposter was caught!';
+    }
+
+    if (celebrate) {
+        const me = data.players[gameState.myPlayerId];
+        const iWon = results.imposterWins ? !!me?.isImposter : !me?.isImposter;
+        if (iWon) {
+            FX.play('fanfare');
+            FX.vibrate([30, 30, 30, 30, 80]);
+            FX.confetti();
+        } else {
+            FX.play('lose');
+            FX.vibrate(120);
+        }
     }
 
     // Show secret word or question
@@ -2164,15 +2307,6 @@ async function updateResultsScreen(data) {
         elements.resultsImposters.appendChild(tag);
     });
 
-    // Show imposter question in question mode
-    const resultsImposterQSection = document.getElementById('results-imposter-question-section');
-    if (gameType === 'question' && data.secretQuestion?.imposter) {
-        resultsImposterQSection?.classList.remove('hidden');
-        document.getElementById('results-imposter-question').textContent = data.secretQuestion.imposter;
-    } else {
-        resultsImposterQSection?.classList.add('hidden');
-    }
-
     // Show vote distribution
     elements.voteResults.innerHTML = '';
     let index = 0;
@@ -2194,28 +2328,6 @@ async function updateResultsScreen(data) {
         elements.voteResults.appendChild(skipItem);
     }
 
-    // Room Leaderboard
-    const leaderboardList = document.getElementById('room-leaderboard-list');
-    const scores = data.scores || {};
-    const leaderboardEntries = Object.entries(data.players || {}).map(([pid, player]) => ({
-        pid,
-        name: player.name,
-        points: scores[pid] || 0
-    }));
-    leaderboardEntries.sort((a, b) => b.points - a.points);
-
-    leaderboardList.innerHTML = '';
-    leaderboardEntries.forEach((entry, idx) => {
-        const row = document.createElement('div');
-        row.className = `room-leaderboard-row ${idx === 0 ? 'top-1' : ''}`;
-        row.innerHTML = `
-            <span class="leaderboard-rank">#${idx + 1}</span>
-            <span class="leaderboard-name">${avatars[idx % avatars.length]} ${entry.name}</span>
-            <span class="leaderboard-points">${entry.points} pt${entry.points !== 1 ? 's' : ''}</span>
-        `;
-        leaderboardList.appendChild(row);
-    });
-
     // === POST-GAME LOBBY AREA ===
 
     // Category
@@ -2227,115 +2339,99 @@ async function updateResultsScreen(data) {
     } else {
         categoryName = CATEGORIES[categoryKey]?.name || 'Countries';
     }
-    elements.resultsCategoryValue.textContent = categoryName;
+    elements.resultsCategoryValue.textContent =
+        `${gameTypeRes === 'question' ? '❓ Question Imposter' : '📝 Secret Word'} · ${categoryName}`;
 
-    // Players List (Similar to Lobby)
+    // Players List (Similar to Lobby) — hosts count as ready implicitly
     elements.resultsPlayersList.innerHTML = '';
     let rIndex = 0;
     Object.entries(data.players).forEach(([pid, player]) => {
+        const isYou = pid === gameState.myPlayerId;
+        const statusBadge = player.isHost
+            ? '<span class="lobby-player-badge">Host</span>'
+            : (player.isReady
+                ? '<span class="lobby-player-badge ready-badge">Ready ✓</span>'
+                : '<span class="lobby-player-badge waiting-badge">Not ready</span>');
         const div = document.createElement('div');
         div.className = 'lobby-player-item';
         div.innerHTML = `
             <div class="lobby-player-avatar">${avatars[rIndex % avatars.length]}</div>
             <div class="lobby-player-info">
-                <span class="lobby-player-name">${player.name}${player.isHost ? ' (Host)' : ''}</span>
+                <span class="lobby-player-name">${player.name}${isYou ? ' (You)' : ''}</span>
             </div>
-            ${player.isReady ? '<span class="ready-icon">✓</span>' : '<span class="not-ready-icon">…</span>'}
+            ${statusBadge}
          `;
         elements.resultsPlayersList.appendChild(div);
         rIndex++;
     });
 
-    // Controls
-    if (MP.isHost()) {
-        elements.resultsHostControls.classList.remove('hidden');
-        elements.resultsWaiting.classList.add('hidden');
-        elements.resultsReadyControls.classList.add('hidden');
-        elements.resultsChangeCategoryBtn.classList.remove('hidden');
-        elements.resultsSettings?.classList.remove('hidden');
-        if (elements.mpResultsAnonymousVoting) {
-            elements.mpResultsAnonymousVoting.checked = data.anonymousVoting || false;
-        }
+    // === Ready strip (top) + host settings panel ===
+    const playerEntries = Object.entries(data.players);
+    const totalPlayers = playerEntries.length;
+    // The host has no ready button, so they count as ready implicitly
+    const othersNotReady = playerEntries.filter(([, p]) => !p.isHost && !p.isReady).length;
+    const readyCount = totalPlayers - othersNotReady;
+    const allOthersReady = othersNotReady === 0;
 
-        const allReady = Object.values(data.players).every(p => p.isReady);
-        const playerCount = Object.keys(data.players).length;
-
-        elements.mpNewRoundBtn.disabled = playerCount < 3 || !allReady;
-        if (playerCount < 3) elements.resultsHostHint.textContent = "Need at least 3 players";
-        else if (!allReady) elements.resultsHostHint.textContent = "Waiting for players...";
-        else elements.resultsHostHint.textContent = "All ready!";
-
-    } else {
-        elements.resultsHostControls.classList.add('hidden');
-        elements.resultsChangeCategoryBtn.classList.add('hidden');
-        // elements.resultsSettings.classList.add('hidden');
-
-        // Ready Toggle
-        const myPlayer = data.players[gameState.myPlayerId];
-        if (myPlayer?.isReady) {
-            elements.resultsReadyControls.classList.remove('hidden');
-            elements.mpResultsReadyBtn.classList.add('btn-ready-confirmed');
-            elements.mpResultsReadyBtn.textContent = "Ready!";
-            elements.resultsWaiting.classList.remove('hidden'); // "Waiting for host..."
+    if (elements.resultsReadyStatus) {
+        if (totalPlayers < 3) {
+            elements.resultsReadyStatus.textContent = 'Need at least 3 players';
+        } else if (allOthersReady) {
+            elements.resultsReadyStatus.textContent = "Everyone's ready!";
         } else {
-            elements.resultsReadyControls.classList.remove('hidden');
-            elements.mpResultsReadyBtn.classList.remove('btn-ready-confirmed');
-            elements.mpResultsReadyBtn.textContent = "I'm Ready";
-            elements.resultsWaiting.classList.add('hidden');
+            elements.resultsReadyStatus.textContent = `${readyCount}/${totalPlayers} players ready`;
         }
     }
 
-    if (gameState.isLeagueGame && gameState.leagueCode && !document.getElementById('mp-league-saved')) {
-        const playerIds = Object.keys(data.players);
-        const imposterIdSet = new Set(results.imposterIds);
+    if (MP.isHost()) {
+        elements.mpResultsReadyBtn?.classList.add('hidden');
+        elements.mpNewRoundBtn?.classList.remove('hidden');
 
-        for (const pid of playerIds) {
-            const player = data.players[pid];
-            const name = player.name;
-            const isImposter = imposterIdSet.has(pid);
-            let points = 0;
-            let isWin = false;
-
-            if (results.imposterWins) {
-                if (isImposter) {
-                    points = 1;
-                    isWin = true;
-                }
-            } else {
-                if (!isImposter) {
-                    points = 1;
-                    isWin = true;
-                }
-            }
-
-            if (points > 0) {
-                await League.addPoints(gameState.leagueCode, name, points, isWin);
-            } else {
-                await League.recordGame(gameState.leagueCode, name);
-            }
+        const canStart = totalPlayers >= 3 && allOthersReady;
+        elements.mpNewRoundBtn.disabled = !canStart;
+        if (elements.mpNewRoundText) {
+            elements.mpNewRoundText.textContent = canStart
+                ? '▶ Start New Round'
+                : `Start New Round (${readyCount}/${totalPlayers} ready)`;
         }
 
-        const savedMsg = document.createElement('div');
-        savedMsg.id = 'mp-league-saved';
-        savedMsg.className = 'league-auto-save-label';
-        savedMsg.textContent = `Points saved to 🏆 ${leagueGameName}`;
-        elements.voteResults.parentNode.insertBefore(savedMsg, elements.voteResults.nextSibling);
+        // Host settings for the next round
+        elements.resultsHostControls.classList.remove('hidden');
+        elements.resultsChangeCategoryBtn.classList.remove('hidden');
+        if (elements.mpResultsAnonymousVoting) {
+            elements.mpResultsAnonymousVoting.checked = data.anonymousVoting || false;
+        }
+        elements.resultsGameTypeWord?.classList.toggle('active', gameTypeRes !== 'question');
+        elements.resultsGameTypeQuestion?.classList.toggle('active', gameTypeRes === 'question');
+
+        const imposterCount = data.imposterCount || 1;
+        const maxImposters = Math.max(1, Math.floor((totalPlayers - 1) / 2));
+        if (elements.resultsImposterCount) elements.resultsImposterCount.textContent = imposterCount;
+        if (elements.resultsImposterMinus) elements.resultsImposterMinus.disabled = imposterCount <= 1;
+        if (elements.resultsImposterPlus) elements.resultsImposterPlus.disabled = imposterCount >= maxImposters;
+    } else {
+        elements.mpNewRoundBtn?.classList.add('hidden');
+        elements.resultsHostControls.classList.add('hidden');
+        elements.resultsChangeCategoryBtn.classList.add('hidden');
+
+        // Ready toggle for non-host players
+        elements.mpResultsReadyBtn?.classList.remove('hidden');
+        const myPlayer = data.players[gameState.myPlayerId];
+        if (myPlayer?.isReady) {
+            elements.mpResultsReadyBtn.classList.add('btn-ready-confirmed');
+            elements.mpResultsReadyText.textContent = "You're ready ✓";
+            elements.mpResultsReadyBtn.title = 'Tap to undo';
+        } else {
+            elements.mpResultsReadyBtn.classList.remove('btn-ready-confirmed');
+            elements.mpResultsReadyText.textContent = "I'm ready";
+            elements.mpResultsReadyBtn.title = '';
+        }
     }
 }
 
 async function mpNewRound() {
-    const playerCount = Object.keys(gameState.roomData?.players || {}).length;
-    if (playerCount < 3) {
-        showAlert('Need at least 3 players to start a new round.');
-        return;
-    }
-
-    const mpSaved = document.getElementById('mp-league-saved');
-    if (mpSaved) mpSaved.remove();
-
     const gameType = gameState.roomData?.gameType || 'word';
-    let category = gameState.roomData?.category || 'countries';
-    if (gameType === 'question' && !category.startsWith('q:')) category = 'q:personalLife';
+    const category = resolveMPCategory(gameType, gameState.roomData?.category);
     const imposterCount = gameState.roomData?.imposterCount || 1;
 
     showLoading('Starting new round...');
@@ -2350,7 +2446,7 @@ async function mpNewRound() {
         hideLoading();
     } catch (err) {
         hideLoading();
-        showAlert('Failed to start new round: ' + err.message);
+        alert('Failed to start new round: ' + err.message);
     }
 }
 
@@ -2361,7 +2457,7 @@ async function mpReturnToLobby() {
         hideLoading();
     } catch (err) {
         hideLoading();
-        showAlert('Failed to return to lobby: ' + err.message);
+        alert('Failed to return to lobby: ' + err.message);
     }
 }
 
@@ -2420,53 +2516,122 @@ async function sendChatMessage() {
 }
 
 // ===============================================
+// MULTIPLAYER MODE - Voice Chat
+// ===============================================
+function showVoiceBar() {
+    elements.voiceBar?.classList.remove('hidden');
+    document.body.classList.add('voice-bar-visible');
+}
+
+function hideVoiceBar() {
+    elements.voiceBar?.classList.add('hidden');
+    document.body.classList.remove('voice-bar-visible');
+}
+
+async function joinVoiceChat() {
+    const roomCode = MP.getRoomCode();
+    const myId = gameState.myPlayerId;
+    if (!roomCode || !myId || Voice.isInVoice()) return;
+
+    elements.voiceJoinBtn.disabled = true;
+    elements.voiceJoinText.textContent = 'Connecting…';
+
+    try {
+        await Voice.joinVoice(roomCode, myId, {
+            onRoster: renderVoiceRoster,
+            onSpeaking: setVoiceSpeaking
+        });
+        FX.play('chime');
+        FX.vibrate(20);
+        elements.voiceJoinBtn.classList.add('hidden');
+        elements.voiceControls.classList.remove('hidden');
+        elements.voiceMicBtn.textContent = '🎤';
+        elements.voiceMicBtn.classList.remove('muted');
+    } catch (err) {
+        console.warn('Voice join failed:', err);
+        elements.voiceJoinText.textContent =
+            err?.name === 'NotAllowedError' ? 'Mic blocked 🚫' : 'Couldn’t connect';
+        setTimeout(() => { elements.voiceJoinText.textContent = 'Join Voice'; }, 2500);
+    } finally {
+        elements.voiceJoinBtn.disabled = false;
+    }
+}
+
+async function leaveVoiceChat() {
+    if (!Voice.isInVoice()) return;
+    await Voice.leaveVoice();
+    elements.voiceControls?.classList.add('hidden');
+    elements.voiceJoinBtn?.classList.remove('hidden');
+    if (elements.voiceJoinText) elements.voiceJoinText.textContent = 'Join Voice';
+    if (elements.voiceParticipants) elements.voiceParticipants.innerHTML = '';
+}
+
+function renderVoiceRoster(users) {
+    if (!elements.voiceParticipants) return;
+    const players = gameState.roomData?.players || {};
+    const playerIds = Object.keys(players);
+    const avatars = getPlayerAvatars();
+
+    elements.voiceParticipants.innerHTML = '';
+    Object.entries(users).forEach(([pid, info]) => {
+        const idx = playerIds.indexOf(pid);
+        const chip = document.createElement('div');
+        chip.className = `voice-chip ${info.muted ? 'muted' : ''}`;
+        chip.dataset.pid = pid;
+        chip.title = players[pid]?.name || 'Player';
+        chip.textContent = idx >= 0 ? avatars[idx % avatars.length] : '🎧';
+        if (info.muted) {
+            const badge = document.createElement('span');
+            badge.className = 'voice-chip-muted';
+            badge.textContent = '🔇';
+            chip.appendChild(badge);
+        }
+        elements.voiceParticipants.appendChild(chip);
+    });
+}
+
+function setVoiceSpeaking(pid, speaking) {
+    const chip = elements.voiceParticipants?.querySelector(`[data-pid="${pid}"]`);
+    chip?.classList.toggle('speaking', speaking);
+}
+
+function toggleVoiceMic() {
+    const muted = Voice.toggleMute();
+    elements.voiceMicBtn.textContent = muted ? '🔇' : '🎤';
+    elements.voiceMicBtn.classList.toggle('muted', muted);
+    FX.play('tap');
+}
+
+// ===============================================
 // Event Listeners
 // ===============================================
 function initEventListeners() {
     // Mode Selection
     elements.localModeBtn?.addEventListener('click', () => {
-        clearLeagueGameState();
         gameState.mode = 'local';
         showScreen('gameType');
     });
 
     elements.multiplayerModeBtn?.addEventListener('click', () => {
-        clearLeagueGameState();
         gameState.mode = 'multiplayer';
         showScreen('mpChoice');
     });
 
     // Game Type Selection
-    document.getElementById('back-from-game-type')?.addEventListener('click', () => {
-        if (gameState.isLeagueGame) {
-            showScreen('leaguePlayers');
-        } else {
-            showScreen('welcome');
-        }
-    });
+    document.getElementById('back-from-game-type')?.addEventListener('click', () => showScreen('welcome'));
     document.getElementById('game-type-word-btn')?.addEventListener('click', () => {
         gameState.gameType = 'word';
-        if (gameState.isLeagueGame) {
-            renderCategories();
-            showScreen('category');
-        } else {
-            if (gameState.players.length === 0) {
-                for (let i = 0; i < 4; i++) addPlayer();
-            }
-            showScreen('players');
+        if (gameState.players.length === 0) {
+            for (let i = 0; i < 4; i++) addPlayer();
         }
+        showScreen('players');
     });
     document.getElementById('game-type-question-btn')?.addEventListener('click', () => {
         gameState.gameType = 'question';
-        if (gameState.isLeagueGame) {
-            renderCategories();
-            showScreen('category');
-        } else {
-            if (gameState.players.length === 0) {
-                for (let i = 0; i < 4; i++) addPlayer();
-            }
-            showScreen('players');
+        if (gameState.players.length === 0) {
+            for (let i = 0; i < 4; i++) addPlayer();
         }
+        showScreen('players');
     });
 
     // Local Mode - Player screen
@@ -2504,23 +2669,48 @@ function initEventListeners() {
     });
 
     // Local Mode - Category screen
-    elements.backToPlayers?.addEventListener('click', () => {
-        if (gameState.isLeagueGame) {
-            showScreen('gameType');
-        } else {
-            showScreen('players');
-        }
-    });
+    elements.backToPlayers?.addEventListener('click', () => showScreen('players'));
 
     // Local Mode - Reveal screen
-    elements.backToCategory?.addEventListener('click', () => showScreen('category'));
-    elements.revealCard?.addEventListener('click', toggleReveal);
-    elements.nextPlayerBtn?.addEventListener('click', nextPlayer);
-    elements.revealAnswerInput?.addEventListener('input', () => {
-        if (gameState.gameType === 'question') {
-            elements.nextPlayerBtn.disabled = !elements.revealAnswerInput.value.trim();
+    elements.backToCategory?.addEventListener('click', () => {
+        // Words have already been dealt — going back abandons the round
+        if (confirm('Go back? This round will be abandoned and roles re-dealt.')) {
+            showScreen('category');
         }
     });
+    elements.revealCard?.addEventListener('click', toggleReveal);
+    elements.nextPlayerBtn?.addEventListener('click', nextPlayer);
+    elements.revealAnswerInput?.addEventListener('input', updateNextPlayerBtnState);
+    elements.revealAnswerInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') nextPlayer();
+    });
+    elements.handoffConfirmBtn?.addEventListener('click', confirmHandoff);
+
+    // Discussion timer
+    elements.timerStartBtn?.addEventListener('click', toggleDiscussionTimer);
+    elements.timerPresets?.querySelectorAll('.timer-preset[data-secs]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            elements.timerPresets.querySelectorAll('.timer-preset[data-secs]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            setTimerDuration(parseInt(btn.dataset.secs, 10));
+            FX.play('tap');
+        });
+    });
+
+    // Sound toggles (welcome strip + timer card)
+    const soundToggles = document.querySelectorAll('.sound-toggle');
+    const renderSoundToggles = () => {
+        soundToggles.forEach(btn => {
+            btn.textContent = FX.isMuted() ? '🔇' : '🔊';
+            btn.classList.toggle('muted', FX.isMuted());
+        });
+    };
+    renderSoundToggles();
+    soundToggles.forEach(btn => btn.addEventListener('click', () => {
+        FX.toggleMuted();
+        renderSoundToggles();
+        FX.play('tap');
+    }));
 
     // Local Mode - Game screen
     elements.revealAnswerBtn?.addEventListener('click', revealAnswer);
@@ -2537,10 +2727,7 @@ function initEventListeners() {
 
     // League Hub
     elements.leagueBtn?.addEventListener('click', showLeagueHub);
-    elements.leagueBackBtn?.addEventListener('click', () => {
-        clearLeagueGameState();
-        showScreen('welcome');
-    });
+    elements.leagueBackBtn?.addEventListener('click', () => showScreen('welcome'));
     elements.createLeagueBtn?.addEventListener('click', showCreateLeagueForm);
     elements.joinLeagueBtn?.addEventListener('click', showJoinLeagueForm);
 
@@ -2557,60 +2744,9 @@ function initEventListeners() {
     elements.leagueCopyBtn?.addEventListener('click', copyLeagueCode);
     elements.leagueLeaveBtn?.addEventListener('click', leagueLeave);
     elements.leagueDeleteBtn?.addEventListener('click', leagueDeleteConfirm);
-    elements.leaguePlayBtn?.addEventListener('click', () => showLeaguePlayScreen());
-
-    // League Play Mode
-    elements.leaguePlayBackBtn?.addEventListener('click', () => {
-        clearLeagueGameState();
-        showLeagueDetail(currentLeagueCode);
-    });
-    elements.leagueLocalBtn?.addEventListener('click', startLeagueLocal);
-    elements.leagueMultiplayerBtn?.addEventListener('click', startLeagueMultiplayer);
-
-    // League Player Select
-    elements.leaguePlayersBackBtn?.addEventListener('click', () => showScreen('leaguePlay'));
-    elements.leagueAddPlayerBtn?.addEventListener('click', addLeaguePlayer);
-    elements.leagueAddPlayerInput?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') addLeaguePlayer();
-    });
-    elements.leaguePlayersContinue?.addEventListener('click', confirmLeaguePlayers);
-
-    elements.leagueImposterMinus?.addEventListener('click', () => {
-        if (gameState.leagueImposterCount > 1) {
-            gameState.leagueImposterCount--;
-            elements.leagueImposterCount.textContent = gameState.leagueImposterCount;
-            updateLeaguePlayerCount();
-        }
-    });
-
-    elements.leagueImposterPlus?.addEventListener('click', () => {
-        const selected = elements.leagueMembersList.querySelectorAll('.league-member-item.selected');
-        const maxImposters = Math.max(1, Math.floor((selected.length - 1) / 2));
-        if (gameState.leagueImposterCount < maxImposters) {
-            gameState.leagueImposterCount++;
-            elements.leagueImposterCount.textContent = gameState.leagueImposterCount;
-            updateLeaguePlayerCount();
-        }
-    });
-
-    elements.leagueImposterRandom?.addEventListener('click', () => {
-        const selected = elements.leagueMembersList.querySelectorAll('.league-member-item.selected');
-        const maxImposters = Math.max(1, Math.floor((selected.length - 1) / 2));
-        if (maxImposters >= 1) {
-            gameState.leagueImposterCount = Math.floor(Math.random() * maxImposters) + 1;
-            elements.leagueImposterCount.textContent = gameState.leagueImposterCount;
-            updateLeaguePlayerCount();
-        }
-    });
 
     // Multiplayer - Choice
-    elements.mpBackToWelcome?.addEventListener('click', () => {
-        if (gameState.isLeagueGame) {
-            showScreen('leaguePlay');
-        } else {
-            showScreen('welcome');
-        }
-    });
+    elements.mpBackToWelcome?.addEventListener('click', () => showScreen('welcome'));
     elements.createRoomBtn?.addEventListener('click', () => showScreen('mpCreate'));
     elements.joinRoomBtn?.addEventListener('click', () => showScreen('mpJoin'));
 
@@ -2632,7 +2768,12 @@ function initEventListeners() {
     });
 
     // Multiplayer - Lobby
-    elements.mpLeaveLobby?.addEventListener('click', leaveRoom);
+    elements.mpLeaveLobby?.addEventListener('click', confirmLeaveRoom);
+
+    // Mid-round leave buttons (word / discussion / voting screens)
+    document.querySelectorAll('.mp-leave-mid').forEach(btn => {
+        btn.addEventListener('click', confirmLeaveRoom);
+    });
     elements.copyCodeBtn?.addEventListener('click', copyRoomCode);
 
     elements.mpImposterMinus?.addEventListener('click', async () => {
@@ -2662,16 +2803,8 @@ function initEventListeners() {
 
     // Start Game (First Time)
     elements.mpStartGameBtn?.addEventListener('click', async () => {
-        const playerCount = Object.keys(gameState.roomData?.players || {}).length;
-        if (playerCount < 3) {
-            showAlert('Need at least 3 players to start the game.');
-            return;
-        }
         const gameType = gameState.roomData?.gameType || 'word';
-        let category = gameState.roomData.category || 'countries';
-        if (gameType === 'question' && !category.startsWith('q:')) {
-            category = 'q:personalLife'; // Default question category
-        }
+        const category = resolveMPCategory(gameType, gameState.roomData?.category);
         showLoading('Starting game...');
         try {
             if (gameType === 'question') {
@@ -2685,7 +2818,7 @@ function initEventListeners() {
             hideLoading();
         } catch (err) {
             hideLoading();
-            showAlert('Failed to start game: ' + err.message);
+            alert('Failed to start game: ' + err.message);
         }
     });
 
@@ -2698,14 +2831,8 @@ function initEventListeners() {
 
     // Post-game "Play" button (Restart)
     elements.mpPlayAgainBtn?.addEventListener('click', async () => {
-        const playerCount = Object.keys(gameState.roomData?.players || {}).length;
-        if (playerCount < 3) {
-            showAlert('Need at least 3 players to start the game.');
-            return;
-        }
         const gameType = gameState.roomData?.gameType || 'word';
-        let category = gameState.roomData?.category || 'countries';
-        if (gameType === 'question' && !category.startsWith('q:')) category = 'q:personalLife';
+        const category = resolveMPCategory(gameType, gameState.roomData?.category);
         showLoading('Starting new game...');
         try {
             if (gameType === 'question') {
@@ -2718,7 +2845,7 @@ function initEventListeners() {
             hideLoading();
         } catch (err) {
             hideLoading();
-            showAlert('Failed to start game: ' + err.message);
+            alert('Failed to start game: ' + err.message);
         }
     });
 
@@ -2729,11 +2856,8 @@ function initEventListeners() {
         await MP.setAnonymousVoting(e.target.checked);
     });
 
-    // Leave buttons (all screens)
-    elements.mpLeaveGameLobby?.addEventListener('click', leaveRoom);
-    elements.mpLeaveGameWord?.addEventListener('click', leaveRoom);
-    elements.mpLeaveGameDiscussion?.addEventListener('click', leaveRoom);
-    elements.mpLeaveGameVoting?.addEventListener('click', leaveRoom);
+    // Leave lobby button
+    elements.mpLeaveGameLobby?.addEventListener('click', confirmLeaveRoom);
 
     // Multiplayer - Category
     elements.mpBackToLobby?.addEventListener('click', () => showScreen('mpLobby'));
@@ -2741,14 +2865,15 @@ function initEventListeners() {
     // Multiplayer - Word
     elements.mpRevealCard?.addEventListener('click', toggleMPReveal);
     elements.mpReadyBtn?.addEventListener('click', markReady);
-    document.getElementById('mp-submit-answer-btn')?.addEventListener('click', async () => {
-        const input = document.getElementById('mp-answer-input');
-        const ans = input?.value?.trim();
-        if (!ans) return;
-        try {
-            await MP.submitAnswer(ans);
-        } catch (e) {
-            console.error('Submit answer failed', e);
+    elements.mpSubmitAnswerBtn?.addEventListener('click', submitMPAnswer);
+    elements.mpAnswerInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitMPAnswer();
+    });
+    elements.mpAnswerInput?.addEventListener('input', () => {
+        // Only gate on input while the answer hasn't been submitted yet
+        const me = gameState.roomData?.players?.[gameState.myPlayerId];
+        if (!me?.answer && !mpAnswerSubmitting) {
+            elements.mpSubmitAnswerBtn.disabled = !elements.mpAnswerInput.value.trim();
         }
     });
 
@@ -2764,59 +2889,37 @@ function initEventListeners() {
     // Multiplayer - Results
     elements.mpNewRoundBtn?.addEventListener('click', mpNewRound);
     elements.mpReturnLobbyBtn?.addEventListener('click', mpReturnToLobby);
-    elements.mpResultsLeaveBtn?.addEventListener('click', leaveRoom);
+    elements.mpResultsLeaveBtn?.addEventListener('click', confirmLeaveRoom);
 
-    elements.mpResultsReadyBtn?.addEventListener('click', () => MP.toggleLobbyReady());
+    elements.mpResultsReadyBtn?.addEventListener('click', () => {
+        FX.play('tap');
+        MP.toggleLobbyReady();
+    });
 
-    // Results Category Toggle
+    // Results — host settings for the next round
+    elements.resultsGameTypeWord?.addEventListener('click', () => {
+        if (MP.isHost()) MP.setGameType('word').catch(err => alert(err.message));
+    });
+    elements.resultsGameTypeQuestion?.addEventListener('click', () => {
+        if (MP.isHost()) MP.setGameType('question').catch(err => alert(err.message));
+    });
+    elements.resultsImposterMinus?.addEventListener('click', () => {
+        const count = gameState.roomData?.imposterCount || 1;
+        if (count > 1) MP.updateImposterCount(count - 1).catch(err => alert(err.message));
+    });
+    elements.resultsImposterPlus?.addEventListener('click', () => {
+        const count = gameState.roomData?.imposterCount || 1;
+        const playerCount = Object.keys(gameState.roomData?.players || {}).length;
+        const max = Math.max(1, Math.floor((playerCount - 1) / 2));
+        if (count < max) MP.updateImposterCount(count + 1).catch(err => alert(err.message));
+    });
+
+    // Results Category Toggle — host picks a new category, then lands back in
+    // the lobby flow (the category screen's back button also goes to lobby).
     elements.resultsChangeCategoryBtn?.addEventListener('click', () => {
-        renderCategories(elements.mpCategoryGrid, (cat) => {
-            // Inline handler for results screen category change
-            // Similar to selectMPCategory but stays on Results screen logic?
-            // Actually, selectMPCategory goes to 'mpLobby'.
-            // We want to update category and STAY on 'mpResults'.
-            showLoading('Updating category...');
-            MP.setCategory(cat).then(() => {
-                hideLoading();
-                // Do not change screen, just update data (which triggers updateResultsScreen)
-            });
-        }, gameType);
-        showScreen('mpCategory'); // This goes to category screen.
-        // Wait, if we go to category screen, how do we come BACK to Results?
-        // Using mpBackToLobby? no.
-        // If we reuse 'mpCategory' screen, 'mpBackToLobby' goes to 'mpLobby'.
-        // We might need 'mpBackToResults' logic.
-        // For simplicity, let's use the standard category picker which returns to Lobby.
-        // User said: "They see category (non-editable). ... The host should see categories... (editable)".
-        // If host edits, does it go to a picker screen? Yes appropriate.
-        // But coming back?
-        // selectMPCategory currently does `showScreen('mpLobby')`.
-        // I should modify selectMPCategory or update the callback.
-        // The helper `renderCategories` takes a callback.
-        // The callback checks `currentScreen`? Or I pass a different callback.
-        // See above: I passed a callback.
-        // But `mpCategory` screen has a "Back" button. `mpBackToLobby`.
-        // If I came from Results, I want to go back to Results.
-        // This is complex state management.
-        // Allow selectMPCategory to function as is -> it redirects to Lobby.
-        // If it redirects to Lobby, we lose the "Results" context.
-        // But Host "New Round" button is ON Results screen.
-        // If we go to Lobby, we are in Lobby.
-        // Does Lobby have "New Round"? No, it has "Start Game".
-        // Basically, Results-as-Lobby is the same as Lobby.
-        // If Host edits category and goes to Lobby, that's fine! 
-        // The "Results" screen is just a transient state.
-        // If Host goes to regular Lobby, they can start game from there.
-        // User said: "The second image shows... New Round button."
-        // If they edit category, they might expect to return to THIS screen.
-        // But if `selectMPCategory` forces Lobby, they land in Lobby.
-        // Given constraints, I'll let it go to Lobby. It's safer.
-        // The callback I provided above `MP.setCategory(cat).then(...)` doesn't switch screen.
-        // But the `showScreen('mpCategory')` DOES switch screen.
-        // And the user must click a category.
-        // The Category Screen "Back" button goes to Lobby.
-        // So inevitably found in Lobby.
-        // I will use `selectMPCategory` standard behavior to avoid stuck state.
+        const gameType = gameState.roomData?.gameType || 'word';
+        renderCategories(elements.mpCategoryGrid, selectMPCategory, gameType);
+        showScreen('mpCategory');
     });
 
     // Also wire up Lobby Ready Button again
@@ -2825,6 +2928,14 @@ function initEventListeners() {
     // Settings listeners (Results)
     elements.mpResultsAnonymousVoting?.addEventListener('change', async (e) => {
         await MP.setAnonymousVoting(e.target.checked);
+    });
+
+    // Voice chat
+    elements.voiceJoinBtn?.addEventListener('click', joinVoiceChat);
+    elements.voiceMicBtn?.addEventListener('click', toggleVoiceMic);
+    elements.voiceLeaveBtn?.addEventListener('click', () => {
+        FX.play('tap');
+        leaveVoiceChat();
     });
 
     // Chat
@@ -2841,11 +2952,19 @@ function initEventListeners() {
             closeModal();
             closeChat();
         }
-        if (e.key === ' ' && screens.reveal.classList.contains('active')) {
+        // Never hijack keys while the user is typing in a field
+        if (e.target.matches?.('input, textarea')) return;
+
+        const handoffVisible = !elements.handoffOverlay?.classList.contains('hidden');
+        if (e.key === 'Enter' && handoffVisible) {
+            confirmHandoff();
+            return;
+        }
+        if (e.key === ' ' && screens.reveal.classList.contains('active') && !handoffVisible) {
             e.preventDefault();
             toggleReveal();
         }
-        if (e.key === 'Enter' && screens.reveal.classList.contains('active') && gameState.isRevealed) {
+        if (e.key === 'Enter' && screens.reveal.classList.contains('active') && !handoffVisible && gameState.isRevealed) {
             nextPlayer();
         }
     });
@@ -2871,10 +2990,6 @@ function initEventListeners() {
         if (e.key === 'Enter') addWordChip();
     });
     elements.addWordBtn?.addEventListener('click', addWordChip);
-
-    // AI Generate
-    elements.aiGenerateBtn?.addEventListener('click', aiGenerateWords);
-    elements.aiGenerateMoreBtn?.addEventListener('click', aiGenerateMore);
 
     // Category name input — update save button state
     elements.catNameInput?.addEventListener('input', updateSaveCatBtn);
@@ -3006,75 +3121,6 @@ function addWordChip() {
     elements.wordInput.focus();
 }
 
-async function aiGenerateWords() {
-    const categoryName = elements.catNameInput?.value?.trim();
-    if (!categoryName) {
-        elements.createCatError.textContent = 'Enter a category name first (e.g. Countries, Roman Emperors)';
-        elements.createCatError.classList.remove('hidden');
-        elements.catNameInput?.focus();
-        return;
-    }
-    elements.createCatError.classList.add('hidden');
-
-    const difficulty = elements.aiDifficultySelect?.value || 'medium';
-    const btn = elements.aiGenerateBtn;
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="ai-btn-icon">⏳</span><span>Generating...</span>';
-    }
-    if (elements.aiGenerateMoreBtn) elements.aiGenerateMoreBtn.disabled = true;
-    showLoading('Generating words with AI...');
-
-    try {
-        const words = await AIGen.generateWordsForCategory(categoryName, null, 20, difficulty, currentWords);
-        currentWords = [...new Set([...currentWords, ...words])];
-        renderWordChips();
-        updateSaveCatBtn();
-        if (elements.aiGenerateMoreBtn) elements.aiGenerateMoreBtn.classList.remove('hidden');
-    } catch (err) {
-        elements.createCatError.textContent = err.message || 'AI generation failed. Try again.';
-        elements.createCatError.classList.remove('hidden');
-    } finally {
-        hideLoading();
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<span class="ai-btn-icon">✨</span><span>Generate with AI</span>';
-        }
-        if (elements.aiGenerateMoreBtn) elements.aiGenerateMoreBtn.disabled = false;
-    }
-}
-
-async function aiGenerateMore() {
-    const categoryName = elements.catNameInput?.value?.trim();
-    if (!categoryName) return;
-
-    const difficulty = elements.aiDifficultySelect?.value || 'medium';
-    const btn = elements.aiGenerateMoreBtn;
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="ai-btn-icon">⏳</span><span>Generating...</span>';
-    }
-    if (elements.aiGenerateBtn) elements.aiGenerateBtn.disabled = true;
-    showLoading('Generating more words...');
-
-    try {
-        const words = await AIGen.generateWordsForCategory(categoryName, null, 10, difficulty, currentWords);
-        currentWords = [...new Set([...currentWords, ...words])];
-        renderWordChips();
-        updateSaveCatBtn();
-    } catch (err) {
-        elements.createCatError.textContent = err.message || 'AI generation failed. Try again.';
-        elements.createCatError.classList.remove('hidden');
-    } finally {
-        hideLoading();
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<span class="ai-btn-icon">➕</span><span>Generate More</span>';
-        }
-        if (elements.aiGenerateBtn) elements.aiGenerateBtn.disabled = false;
-    }
-}
-
 function renderWordChips() {
     elements.wordChipList.innerHTML = '';
     elements.wordCountBadge.textContent = currentWords.length;
@@ -3123,85 +3169,37 @@ async function publishCustomCategory() {
     const name = elements.catNameInput.value.trim();
     if (!name || currentWords.length < 5) return;
 
+    // Save first if unsaved
+    const cat = {
+        id: editingCatId || undefined,
+        name,
+        icon: getSelectedEmoji(),
+        words: [...currentWords]
+    };
+    const saved = await CustomCat.saveLocalCategory(cat);
+    editingCatId = saved.id;
+
     const authorName = elements.authorNameInput.value.trim() || 'Anonymous';
     elements.publishCatBtn.disabled = true;
     elements.publishStatus.textContent = '⏳ Publishing...';
     elements.publishStatus.classList.remove('hidden');
 
     try {
-        if (!Auth.getCurrentUser()) {
-            await Auth.signInAsGuest();
-        }
-
-        const cat = {
-            id: editingCatId || undefined,
-            name,
-            icon: getSelectedEmoji(),
-            words: [...currentWords]
-        };
-        const saved = await CustomCat.saveLocalCategory(cat);
-        editingCatId = saved.id;
-
         await CustomCat.publishCategory(saved, authorName);
         elements.publishStatus.textContent = '✅ Published to Community Hub!';
         setTimeout(() => {
             showCommunityHub();
-        }, 1500);
+        }, 1200);
     } catch (e) {
-        console.error('[Publish] Failed:', e);
-        elements.publishStatus.textContent = `❌ ${e.message || 'Failed to publish. Try again.'}`;
+        elements.publishStatus.textContent = '❌ Failed to publish. Try again.';
         elements.publishCatBtn.disabled = false;
     }
 }
 
 function deleteCustomCategory(id) {
-    showConfirm('Delete this category?', () => {
-        CustomCat.deleteLocalCategory(id);
-        renderMyCategoriesList();
-    });
-}
-
-let _confirmResolve = null;
-function showConfirm(message, onConfirm) {
-    const modal = document.getElementById('confirm-modal');
-    const msgEl = document.getElementById('confirm-message');
-    const okBtn = document.getElementById('confirm-ok-btn');
-    const cancelBtn = document.getElementById('confirm-cancel-btn');
-
-    msgEl.textContent = message;
-    modal.classList.remove('hidden');
-
-    const cleanup = () => {
-        modal.classList.add('hidden');
-        okBtn.replaceWith(okBtn.cloneNode(true));
-        cancelBtn.replaceWith(cancelBtn.cloneNode(true));
-    };
-
-    document.getElementById('confirm-ok-btn').addEventListener('click', () => {
-        cleanup();
-        onConfirm();
-    });
-    document.getElementById('confirm-cancel-btn').addEventListener('click', cleanup);
-    document.querySelector('.confirm-backdrop').addEventListener('click', cleanup);
-}
-
-function showAlert(message, onDismiss) {
-    const modal = document.getElementById('alert-modal');
-    const msgEl = document.getElementById('alert-message');
-    const okBtn = document.getElementById('alert-ok-btn');
-
-    msgEl.textContent = message;
-    modal.classList.remove('hidden');
-
-    const cleanup = () => {
-        modal.classList.add('hidden');
-        okBtn.replaceWith(okBtn.cloneNode(true));
-    };
-
-    document.getElementById('alert-ok-btn').addEventListener('click', () => {
-        cleanup();
-        if (onDismiss) onDismiss();
-    });
+    if (!confirm('Delete this category?')) return;
+    CustomCat.deleteLocalCategory(id);
+    renderMyCategoriesList();
 }
 
 // ===============================================
@@ -3225,7 +3223,7 @@ async function showCommunityHub() {
     }
 }
 
-async function renderCommunityList(cats) {
+function renderCommunityList(cats) {
     elements.communityLoading.classList.add('hidden');
     elements.communityList.innerHTML = '';
 
@@ -3238,12 +3236,8 @@ async function renderCommunityList(cats) {
     elements.communityEmpty.classList.add('hidden');
     elements.communityList.classList.remove('hidden');
 
-    const upvoteStatuses = await Promise.all(
-        cats.map(cat => CustomCat.hasUpvoted(cat.id).catch(() => false))
-    );
-
-    cats.forEach((cat, i) => {
-        const alreadyVoted = upvoteStatuses[i];
+    cats.forEach(cat => {
+        const alreadyVoted = CustomCat.hasUpvoted(cat.id);
         const card = document.createElement('div');
         card.className = 'community-card';
         card.dataset.communityId = cat.id;
@@ -3257,7 +3251,7 @@ async function renderCommunityList(cats) {
             </div>
             <div class="community-card-footer">
                 <button class="btn-upvote ${alreadyVoted ? 'voted' : ''}" data-upvote="${cat.id}">
-                    👍 <span class="upvote-count">${cat.upvotes || 0}</span>
+                    ${alreadyVoted ? '👍' : '👍'} <span class="upvote-count">${cat.upvotes || 0}</span>
                 </button>
                 <button class="btn btn-secondary btn-small" data-import="${cat.id}">⬇️ Import</button>
             </div>
@@ -3266,21 +3260,13 @@ async function renderCommunityList(cats) {
         const upvoteBtn = card.querySelector('[data-upvote]');
         upvoteBtn.addEventListener('click', async () => {
             if (upvoteBtn.classList.contains('voted')) return;
-            upvoteBtn.disabled = true;
             try {
-                if (!Auth.getCurrentUser()) {
-                    await Auth.signInAsGuest();
-                }
                 const result = await CustomCat.upvoteCategory(cat.id);
                 if (!result.alreadyVoted) {
                     upvoteBtn.classList.add('voted');
                     upvoteBtn.querySelector('.upvote-count').textContent = result.newCount;
                 }
-            } catch (e) {
-                console.error('[Upvote] Failed:', e);
-            } finally {
-                upvoteBtn.disabled = false;
-            }
+            } catch (e) { /* silent */ }
         });
 
         const importBtn = card.querySelector('[data-import]');
@@ -3466,8 +3452,20 @@ function initAuth() {
 
     // Single auth state listener: update UI
     Auth.onAuthChange(async user => {
+        // Only run auto-guest logic here if we know there's no auth yet
         if (!user) {
-            showScreen('onboarding');
+            const hasVisited = localStorage.getItem('imposter-has-visited');
+            if (!hasVisited) {
+                showScreen('onboarding');
+            } else {
+                try {
+                    await Auth.signInAsGuest();
+                    showScreen('welcome');
+                } catch (e) {
+                    console.warn('Guest sign-in failed:', e);
+                    showScreen('onboarding');
+                }
+            }
             return;
         }
 
@@ -3489,15 +3487,12 @@ function initAuth() {
         }
     });
 
-    // Auth chip (avatar) — opens profile if signed in, onboarding if guest
+    // Auth chip (avatar) — opens the profile screen (guests can rename
+    // themselves or link a Google account from there)
     elements.authAvatarBtn?.addEventListener('click', () => {
         const user = Auth.getCurrentUser();
-        if (user && !user.isAnonymous) {
-            showScreen('profile');
-            populateProfileScreen(user);
-        } else {
-            showScreen('onboarding');
-        }
+        showScreen('profile');
+        if (user) populateProfileScreen(user);
     });
 
     // Landing buttons are attached in attachLandingListeners() (called first in init)
@@ -3548,10 +3543,9 @@ function initAuth() {
     });
 }
 
-// Start the app.
-// Support both normal page load and dynamic script injection (React bridge).
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
-}
+// Voice diagnostics for automated tests / debugging from the console
+window.__voiceDebug = Voice.getDebugInfo;
+
+// Start the app
+document.addEventListener('DOMContentLoaded', init);
+

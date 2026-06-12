@@ -1,7 +1,7 @@
 // Multiplayer Module for Secret Word Imposter
 // Uses Firebase Realtime Database for real-time synchronization
 
-import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
     getDatabase,
     ref,
@@ -18,7 +18,6 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth
 
 // Firebase configuration
 import { firebaseConfig } from "./firebase-config.js";
-import { calculateVoteResults, calculateRoundPoints } from "./multiplayerLogic.js";
 
 // Initialize Firebase
 // Re-use auth-app (shared Firebase app instance)
@@ -60,16 +59,10 @@ function generatePlayerId() {
     return 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
-function cryptoRandom() {
-    const arr = new Uint32Array(1);
-    crypto.getRandomValues(arr);
-    return arr[0] / (0xFFFFFFFF + 1);
-}
-
 function shuffleArray(array) {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(cryptoRandom() * (i + 1));
+        const j = Math.floor(Math.random() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     return shuffled;
@@ -282,19 +275,17 @@ async function showResults() {
 
     const { roomCode } = multiplayerState;
 
-    const playersRef = ref(db, `rooms/${roomCode}/players`);
-    const snapshot = await get(playersRef);
-    if (!snapshot.exists()) {
-        await update(ref(db, `rooms/${roomCode}`), { status: 'results' });
-        return;
+    // isReady meant "ready for discussion" during the round; clear it for
+    // non-host players so the post-round "I'm ready" flow starts fresh
+    // (the host counts as ready implicitly).
+    const playersSnap = await get(ref(db, `rooms/${roomCode}/players`));
+    const updates = { [`rooms/${roomCode}/status`]: 'results' };
+    if (playersSnap.exists()) {
+        Object.entries(playersSnap.val()).forEach(([pid, player]) => {
+            updates[`rooms/${roomCode}/players/${pid}/isReady`] = !!player.isHost;
+        });
     }
-
-    const players = snapshot.val();
-    const results = calculateVoteResults(players);
-    const pointsMap = calculateRoundPoints(players, results);
-
-    await addRoomPoints(pointsMap);
-    await update(ref(db, `rooms/${roomCode}`), { status: 'results' });
+    await update(ref(db), updates);
 }
 
 async function newRound() {
@@ -394,7 +385,9 @@ async function updateImposterCount(count) {
     }
 
     const { roomCode } = multiplayerState;
-    await update(ref(db, `rooms/${roomCode}`), { imposterCount: count });
+    const roomRef = ref(db, `rooms/${roomCode}`);
+    assertNotMidRound(await get(roomRef), 'imposter count');
+    await update(roomRef, { imposterCount: count });
 }
 
 // ===============================================
@@ -480,6 +473,76 @@ function getRoomCode() {
 }
 
 // ===============================================
+// Vote Calculation
+// ===============================================
+function calculateVoteResults(players) {
+    const votes = {};
+    let totalVotes = 0;
+    let skippedVotes = 0;
+
+    Object.entries(players).forEach(([pid, player]) => {
+        if (player.vote === 'skip') {
+            skippedVotes++;
+            totalVotes++;
+        } else if (player.vote) {
+            votes[player.vote] = (votes[player.vote] || 0) + 1;
+            totalVotes++;
+        }
+    });
+
+    // Find who got the most votes
+    let maxVotes = 0;
+    let eliminated = null;
+    let tie = false;
+
+    Object.entries(votes).forEach(([pid, count]) => {
+        if (count > maxVotes) {
+            maxVotes = count;
+            eliminated = pid;
+            tie = false;
+        } else if (count === maxVotes) {
+            tie = true;
+        }
+    });
+
+    // Check if skip won
+    if (skippedVotes > maxVotes) {
+        eliminated = null;
+        tie = false;
+    } else if (skippedVotes === maxVotes) {
+        tie = true;
+    }
+
+    // Determine winner
+    const imposterIds = Object.entries(players)
+        .filter(([_, p]) => p.isImposter)
+        .map(([id, _]) => id);
+
+    let imposterWins = false;
+
+    if (tie || !eliminated) {
+        // No one eliminated = imposter survives = imposter wins
+        imposterWins = true;
+    } else if (imposterIds.includes(eliminated)) {
+        // Imposter was voted out = crew wins
+        imposterWins = false;
+    } else {
+        // Wrong person voted out = imposter wins
+        imposterWins = true;
+    }
+
+    return {
+        votes,
+        skippedVotes,
+        totalVotes,
+        eliminated,
+        tie,
+        imposterWins,
+        imposterIds
+    };
+}
+
+// ===============================================
 // Lobby Ready (for post-game)
 // ===============================================
 async function toggleLobbyReady() {
@@ -514,6 +577,9 @@ async function playAgain(category, secretWord, gameType = 'word', secretQuestion
     if (snapshot.exists()) {
         const players = snapshot.val();
         const playerIds = Object.keys(players);
+        if (playerIds.length < 3) {
+            throw new Error('Need at least 3 players to start.');
+        }
         const imposterCountRef = ref(db, `rooms/${roomCode}/imposterCount`);
         const imposterSnapshot = await get(imposterCountRef);
         const imposterCount = imposterSnapshot.exists() ? imposterSnapshot.val() : 1;
@@ -568,21 +634,13 @@ async function resetForNewGame() {
     }
 }
 
-async function addRoomPoints(pointsMap) {
-    const { roomCode } = multiplayerState;
-    if (!roomCode) return;
-
-    const scoresRef = ref(db, `rooms/${roomCode}/scores`);
-    const snapshot = await get(scoresRef);
-    const currentScores = snapshot.exists() ? snapshot.val() : {};
-
-    const updates = {};
-    Object.entries(pointsMap).forEach(([pid, points]) => {
-        const current = currentScores[pid] || 0;
-        updates[`rooms/${roomCode}/scores/${pid}`] = current + points;
-    });
-
-    await update(ref(db), updates);
+// Settings may only change between rounds (lobby / results), never while a
+// round is being played or voted on.
+function assertNotMidRound(roomSnap, what) {
+    const status = roomSnap?.exists() ? roomSnap.val().status : null;
+    if (status === 'playing' || status === 'voting') {
+        throw new Error(`Can't change ${what} during an active round.`);
+    }
 }
 
 async function setCategory(category) {
@@ -590,7 +648,9 @@ async function setCategory(category) {
         throw new Error('Only the host can set the category.');
     }
     const { roomCode } = multiplayerState;
-    await update(ref(db, `rooms/${roomCode}`), { category });
+    const roomRef = ref(db, `rooms/${roomCode}`);
+    assertNotMidRound(await get(roomRef), 'category');
+    await update(roomRef, { category });
 }
 
 async function setGameType(gameType) {
@@ -600,12 +660,18 @@ async function setGameType(gameType) {
     const { roomCode } = multiplayerState;
     const roomRef = ref(db, `rooms/${roomCode}`);
     const snap = await get(roomRef);
+    assertNotMidRound(snap, 'game mode');
     const updates = { gameType: gameType || 'word' };
-    // When switching to question, default category if current is word category
-    if (gameType === 'question' && snap.exists()) {
+    // Keep category compatible with the selected game type, so the displayed
+    // default is always the real one (a stale 'q:' category in word mode used
+    // to crash word picking at game start).
+    if (snap.exists()) {
         const cat = snap.val().category;
-        if (!cat || !cat.startsWith('q:')) {
+        if (gameType === 'question' && (!cat || !cat.startsWith('q:'))) {
             updates.category = 'q:twistAndTurn';
+        }
+        if (gameType !== 'question' && (!cat || cat.startsWith('q:'))) {
+            updates.category = 'countries';
         }
     }
     await update(roomRef, updates);
@@ -634,7 +700,6 @@ export {
     resetForNewGame,
     setCategory,
     setGameType,
-    addRoomPoints,
     subscribeToRoom,
     subscribeToChat,
     sendChatMessage,
