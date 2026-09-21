@@ -3,9 +3,7 @@
 //   rooms/{code}/voiceUsers/{playerId}   — presence + mute state
 //   rooms/{code}/voiceSignals/{playerId} — per-player signal inbox (offer/answer/ICE)
 
-import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
-    getDatabase,
     ref,
     set,
     get,
@@ -15,16 +13,8 @@ import {
     onDisconnect,
     remove,
     update
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import { firebaseConfig } from "./firebase-config.js";
-
-let app;
-try {
-    app = getApp();
-} catch {
-    app = initializeApp(firebaseConfig);
-}
-const db = getDatabase(app);
+} from "firebase/database";
+import { database as db, auth } from './firebase-client.js';
 
 // STUN is enough for most home/mobile networks. If players behind strict NATs
 // can't hear each other, add a TURN server entry here.

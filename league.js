@@ -4,29 +4,16 @@
 // Local leagues: device-only, offline-capable
 // ===============================================
 
-import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
-    getDatabase,
     ref,
     set,
     get,
     update,
     remove,
     serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+} from "firebase/database";
 
-import { firebaseConfig } from "./firebase-config.js";
-
-let leagueApp;
-try {
-    leagueApp = getApp();
-} catch {
-    leagueApp = initializeApp(firebaseConfig);
-}
-
-const db = getDatabase(leagueApp);
-const auth = getAuth(leagueApp);
+import { database as db, auth } from './firebase-client.js';
 
 const JOINED_KEY = 'imposter-joined-leagues';
 const LOCAL_LEAGUES_KEY = 'imposter-local-leagues-v1';

@@ -29,6 +29,8 @@ android/
 ios/
 www/
 public/legacy/
+public/categories.js
+public/questionCategories.js
 
 # Logs
 *.log

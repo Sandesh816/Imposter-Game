@@ -5,7 +5,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebas
 import { get, push, ref, set, update } from 'firebase/database';
 import { calculateRoundPoints, calculateVoteResults } from '../../multiplayerLogic.js';
 
-const PROJECT_ID = 'imposter-sandeshg';
+const PROJECT_ID = 'demo-imposter-review';
 
 function getDbHostPort() {
   const raw = process.env.FIREBASE_DATABASE_EMULATOR_HOST || '127.0.0.1:9002';

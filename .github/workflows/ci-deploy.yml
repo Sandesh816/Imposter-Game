@@ -16,9 +16,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  PLAYWRIGHT_BASE_URL: https://imposter-sandeshg.web.app
-
 jobs:
   tests:
     name: Unit + Integration + E2E
@@ -32,7 +29,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -47,8 +44,8 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: Run deployed multiplayer E2E
-        run: npm run test:e2e:deployed
+      - name: Build and test this change locally
+        run: npm run test:e2e
 
       - name: Upload Playwright artifacts on failure
         if: failure()
@@ -75,7 +72,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies

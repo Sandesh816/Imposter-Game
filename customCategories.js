@@ -5,30 +5,16 @@
 // localStorage used as cache/fallback only
 // ===============================================
 
-import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
-    getDatabase,
     ref,
     set,
     get,
     update,
     remove,
     push
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+} from "firebase/database";
 
-import { firebaseConfig } from "./firebase-config.js";
-
-// Re-use auth-app (shared Firebase app instance)
-let catApp;
-try {
-    catApp = getApp();
-} catch {
-    catApp = initializeApp(firebaseConfig);
-}
-
-const db = getDatabase(catApp);
-const auth = getAuth(catApp);
+import { app, database as db, auth } from './firebase-client.js';
 
 // ---- Keys ----
 const LOCAL_KEY = 'imposter-custom-categories'; // localStorage cache/fallback

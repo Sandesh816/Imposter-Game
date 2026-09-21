@@ -1,4 +1,4 @@
-import { cp, mkdir, rm, access } from 'node:fs/promises';
+import { cp, mkdir, rm, access, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,6 +20,11 @@ const requiredFiles = [
   'auth.js',
   'aiGenerate.js',
   'gameEngine.js',
+  'voice.js',
+  'fx.js',
+  'ui/safe-text.js',
+  'firebase-client.js',
+  'firebase-environment.js',
   'firebase-config.example.js',
 ];
 
@@ -41,11 +46,17 @@ async function main() {
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
 
+  // Classic scripts in the root homepage must also exist at the root URL.
+  for (const fileName of ['categories.js', 'questionCategories.js']) {
+    await copyFile(path.join(root, fileName), path.join(root, 'public', fileName));
+  }
+
   if (!(await exists(legacyIndexSource))) {
     throw new Error(`Missing legacy shell at ${legacyIndexSource}`);
   }
 
-  await copyFile(legacyIndexSource, path.join(outputDir, 'index.html'));
+  // One built application owns configuration; old bookmarks reach that same app.
+  await writeFile(path.join(outputDir, 'index.html'), '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=../"><title>Imposter Game</title><a href="../">Open Imposter Game</a>');
 
   for (const fileName of requiredFiles) {
     const source = path.join(root, fileName);

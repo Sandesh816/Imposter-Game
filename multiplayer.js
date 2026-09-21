@@ -1,9 +1,7 @@
 // Multiplayer Module for Secret Word Imposter
 // Uses Firebase Realtime Database for real-time synchronization
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
-    getDatabase,
     ref,
     set,
     get,
@@ -13,23 +11,10 @@ import {
     remove,
     update,
     serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+} from "firebase/database";
 
 // Firebase configuration
-import { firebaseConfig } from "./firebase-config.js";
-
-// Initialize Firebase
-// Re-use auth-app (shared Firebase app instance)
-let mpApp;
-try {
-    mpApp = getApp();
-} catch {
-    mpApp = initializeApp(firebaseConfig);
-}
-
-const db = getDatabase(mpApp);
-const auth = getAuth(mpApp);
+import { database as db, auth } from './firebase-client.js';
 
 // ===============================================
 // Multiplayer State
