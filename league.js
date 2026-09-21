@@ -1,3 +1,4 @@
+import { httpsCallable } from 'firebase/functions';
 // ===============================================
 // League Module — Cloud + Local Offline
 // Cloud leagues: Firebase-backed with sharable code
@@ -10,10 +11,11 @@ import {
     get,
     update,
     remove,
+    runTransaction,
     serverTimestamp
 } from "firebase/database";
 
-import { database as db, auth } from './firebase-client.js';
+import { functions, database as db, auth } from './firebase-client.js';
 
 const JOINED_KEY = 'imposter-joined-leagues';
 const LOCAL_LEAGUES_KEY = 'imposter-local-leagues-v1';
@@ -159,11 +161,9 @@ function generateLocalLeagueCode(existing) {
 }
 
 function canAdminCloudLeague(data, uid) {
-    if (!uid && data?.createdBy === 'anonymous') return true;
     if (!uid) return false;
     if (data?.admins && data.admins[uid]) return true;
     if (data?.createdBy && data.createdBy === uid) return true;
-    if (!data?.admins && !data?.createdBy) return true;
     return false;
 }
 
@@ -245,26 +245,9 @@ async function createLeague(leagueName, options = {}) {
         return localCode;
     }
 
-    const uid = currentUid();
-    const code = generateLeagueCode();
-    const leagueRef = ref(db, `leagues/${code}`);
-    const snap = await get(leagueRef);
-    if (snap.exists()) {
-        return createLeague(name, options);
-    }
-
-    await set(leagueRef, {
-        name,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: uid || 'anonymous',
-        admins: uid ? { [uid]: true } : {},
-        roster,
-        players
-    });
-
-    await saveLeagueMembership(code);
-    return code;
+    const response = await httpsCallable(functions, 'leagueCommand')({action:'create', commandId:crypto.randomUUID(), payload:{name,roster:options.playerNames || []}});
+    await saveLeagueMembership(response.data.code);
+    return response.data.code;
 }
 
 async function joinLeague(leagueCode) {
@@ -276,18 +259,8 @@ async function joinLeague(leagueCode) {
         throw new Error('Local leagues are only available on the device that created them.');
     }
 
-    const leagueRef = ref(db, `leagues/${code}`);
-    const snap = await get(leagueRef);
-    if (!snap.exists()) {
-        throw new Error('League not found. Check the code and try again.');
-    }
-
+    await httpsCallable(functions, 'leagueCommand')({action:'join', code, commandId:crypto.randomUUID(), payload:{}});
     await saveLeagueMembership(code);
-
-    const uid = currentUid();
-    if (uid) {
-        await set(ref(db, `leagues/${code}/admins/${uid}`), true);
-    }
 
     return code;
 }
@@ -411,19 +384,11 @@ async function upsertPlayerScore(leagueCode, playerName, deltaPoints, isWin) {
     }
 
     const playerRef = ref(db, `leagues/${leagueCode}/players/${key}`);
-    const snap = await get(playerRef);
-    const current = snap.exists() ? snap.val() : {
-        displayName: trimmed,
-        points: 0,
-        gamesPlayed: 0,
-        wins: 0
-    };
-
-    current.displayName = trimmed;
-    current.points = (current.points || 0) + deltaPoints;
-    current.gamesPlayed = (current.gamesPlayed || 0) + 1;
-    if (isWin) current.wins = (current.wins || 0) + 1;
-    await set(playerRef, current);
+    await assertCloudAdmin(leagueCode);
+    await runTransaction(playerRef, current => {
+        current ||= {displayName:trimmed,points:0,gamesPlayed:0,wins:0};
+        return {...current,displayName:trimmed,points:(current.points||0)+deltaPoints,gamesPlayed:(current.gamesPlayed||0)+1,wins:(current.wins||0)+(isWin?1:0)};
+    });
 
     await update(ref(db, `leagues/${leagueCode}`), {
         [`roster/${key}/displayName`]: trimmed,

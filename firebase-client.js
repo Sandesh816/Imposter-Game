@@ -5,7 +5,9 @@ import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { firebaseConfig } from './firebase-config.js';
 import { resolveFirebaseEnvironment } from './firebase-environment.js';
 
-const environment = resolveFirebaseEnvironment(import.meta.env || {}, firebaseConfig);
+const environment = import.meta.env.VITE_USE_EMULATORS === '1'
+    ? resolveFirebaseEnvironment(import.meta.env, firebaseConfig)
+    : { config: firebaseConfig, emulators: false };
 export const app = getApps().length ? getApp() : initializeApp(environment.config);
 export const auth = getAuth(app);
 export const database = getDatabase(app);

@@ -21,6 +21,7 @@ async function render(page, functions, expression) {
     const gameState = { myPlayerId: 'me', roomData: { anonymousVoting: false }, selectedVote: null, unreadMessages: 0 };
     const getPlayerAvatars = () => ['🙂'];
     const updateMPImposterLimits = () => {};
+    const MP = {isHost:()=>false};
     eval(`${helper}\n${code}\n${expression}`);
   }, {helper, code: functions.map(functionSource).join('\n'), expression});
 }
@@ -43,4 +44,17 @@ test('departed voting card is removed without throwing', async ({page}) => {
     if(gameState.selectedVote!==null) throw new Error('Departed target remains selected');
   `);
   await expect(page.locator('.voting-card[data-player-id="gone"]')).toHaveCount(0);
+});
+test('completed results retain departed imposter names and votes', async ({page}) => {
+  await render(page, ['updateResultsScreen'], `
+    const players={me:{name:'Me'},gone:{name:'<img src=x>',isImposter:true}};
+    const data={players:{me:players.me},secretWord:'Canada',results:{
+      players,imposterIds:['gone'],imposterWins:false,eliminated:'gone',votes:{gone:2},skippedVotes:0
+    }};
+    updateResultsScreen(data);
+    if(elements.resultsPlayersList.textContent.includes('<img src=x>')) throw new Error('Departed player remains in next-round lobby');
+  `);
+  await expect(page.locator('.imposter-tag').last()).toHaveText('🕵️ <img src=x>');
+  await expect(page.locator('.vote-result-item.eliminated').last()).toHaveText('🙂 <img src=x>: 2 votes');
+  await expect(page.locator('.imposter-tag img')).toHaveCount(0);
 });

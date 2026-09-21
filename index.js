@@ -537,7 +537,7 @@ function updateMPImposterLimits(playerCount) {
 
     if (gameState.mpImposterCount > maxImposters) {
         gameState.mpImposterCount = maxImposters;
-        MP.updateImposterCount(maxImposters);
+        if (MP.isHost() && ['lobby','results'].includes(gameState.roomData?.status)) MP.updateImposterCount(maxImposters).catch(console.warn);
     }
 
     if (elements.mpImposterMinus) {
@@ -1577,7 +1577,7 @@ function confirmLeaveRoom() {
             : 'Leave and close the room for everyone?';
     } else {
         msg = midRound
-            ? 'Leave mid-round? You won\'t be able to rejoin until the next game.'
+            ? 'Leave mid-round? This round will be cancelled without points for everyone.'
             : 'Leave the room?';
     }
     if (confirm(msg)) leaveRoom();
@@ -1633,6 +1633,10 @@ function handleRoomUpdate(data) {
     // Update lobby UI
     updateLobbyUI(data, isHost, players, playerCount);
 
+    let notice = document.getElementById('room-status-notice');
+    if (!notice) { notice = document.createElement('div'); notice.id = 'room-status-notice'; notice.setAttribute('role','status'); document.body.append(notice); }
+    notice.textContent = data.paused ? 'Waiting for a player to reconnect (up to 60 seconds)…' : (data.message || '');
+    notice.hidden = !notice.textContent;
     // Handle status transitions
     switch (data.status) {
         case 'lobby':
@@ -1745,7 +1749,7 @@ function updateLobbyUI(data, isHost, players, playerCount) {
         elements.mpImposterSettings.classList.remove('hidden');
 
         // Host is always ready. Check if others are ready.
-        const allReady = Object.values(players).every(p => p.isReady);
+        const allReady = Object.values(players).every(p => p.isReady && p.isConnected);
         elements.mpStartGameBtn.disabled = playerCount < 3 || !allReady;
 
         if (playerCount < 3) {
@@ -1946,7 +1950,7 @@ function updateWordScreenStatus(data) {
     const ready = Object.values(players).filter(p => p.isReady).length;
 
     elements.mpPlayersSeen.textContent = `${seen} of ${total} have seen their word. ${ready} ready.`;
-    elements.mpReadyBtn.disabled = !myPlayer?.hasSeenWord;
+    elements.mpReadyBtn.disabled = data.paused || myPlayer?.isReady || !myPlayer?.hasSeenWord;
 }
 
 function toggleMPReveal() {
@@ -1976,9 +1980,9 @@ function checkAllReady(data) {
     const gameType = data.gameType || 'word';
     const players = Object.values(data.players);
 
-    const allReady = gameType === 'question'
+    const allReady = !data.paused && (data.discussionReady ?? (gameType === 'question'
         ? players.every(p => p.hasSeenWord && p.answer) // All submitted answers
-        : players.every(p => p.isReady);
+        : players.every(p => p.isReady)));
 
     if (allReady && players.length >= 3) {
         updateDiscussionScreen(data);
@@ -2061,7 +2065,7 @@ function updateDiscussionScreen(data) {
         .sort(([pidA], [pidB]) => pidA.localeCompare(pidB))
         .map(([pid, p]) => ({ pid, name: p.name }));
 
-    const seedString = data.roomCode + (data.secretWord || '') + (data.createdAt || '') + (data.imposterCount || 1);
+    const seedString = data.roomCode + (data.roundId || data.createdAt || '');
 
     // Deterministic shuffle
     const shuffledPlayers = seededShuffle(playersList, seedString);
@@ -2173,7 +2177,7 @@ function updateVotingStatus(data) {
 
     // Show waiting message if you've voted
     const myPlayer = players[gameState.myPlayerId];
-    if (myPlayer?.vote) {
+    if (myPlayer?.vote || data.paused) {
         elements.voteWaiting.classList.remove('hidden');
         elements.submitVoteBtn.disabled = true;
         elements.skipVoteBtn.disabled = true;
@@ -2263,7 +2267,8 @@ function checkAllVoted(data) {
 // MULTIPLAYER MODE - Results Screen
 // ===============================================
 function updateResultsScreen(data, celebrate = false) {
-    const results = MP.calculateVoteResults(data.players);
+    const results = data.results || MP.calculateVoteResults(data.players);
+    const resultPlayers = results.players || data.players;
     const avatars = getPlayerAvatars();
 
     // Update header
@@ -2278,7 +2283,7 @@ function updateResultsScreen(data, celebrate = false) {
     }
 
     if (celebrate) {
-        const me = data.players[gameState.myPlayerId];
+        const me = resultPlayers[gameState.myPlayerId];
         const iWon = results.imposterWins ? !!me?.isImposter : !me?.isImposter;
         if (iWon) {
             FX.play('fanfare');
@@ -2303,21 +2308,19 @@ function updateResultsScreen(data, celebrate = false) {
 
     // Show imposters
     elements.resultsImposters.innerHTML = '';
-    const playerIds = Object.keys(data.players);
-
     results.imposterIds.forEach(pid => {
-        const player = data.players[pid];
+        const player = resultPlayers[pid];
         const tag = document.createElement('span');
         tag.className = 'imposter-tag';
-        tag.innerHTML = html`🕵️ ${player.name}`;
+        tag.innerHTML = html`🕵️ ${player?.name || 'Departed player'}`;
         elements.resultsImposters.appendChild(tag);
     });
 
     // Show vote distribution
     elements.voteResults.innerHTML = '';
     let index = 0;
-    Object.entries(data.players).forEach(([pid, player]) => {
-        const votesReceived = results.votes[pid] || 0;
+    Object.entries(resultPlayers).forEach(([pid, player]) => {
+        const votesReceived = results.votes?.[pid] || 0;
         if (votesReceived > 0 || pid === results.eliminated) {
             const item = document.createElement('div');
             item.className = `vote-result-item ${pid === results.eliminated ? 'eliminated' : ''}`;
@@ -2393,7 +2396,7 @@ function updateResultsScreen(data, celebrate = false) {
         elements.mpResultsReadyBtn?.classList.add('hidden');
         elements.mpNewRoundBtn?.classList.remove('hidden');
 
-        const canStart = totalPlayers >= 3 && allOthersReady;
+        const canStart = totalPlayers >= 3 && allOthersReady && playerEntries.every(([,p])=>p.isConnected);
         elements.mpNewRoundBtn.disabled = !canStart;
         if (elements.mpNewRoundText) {
             elements.mpNewRoundText.textContent = canStart
@@ -3483,6 +3486,16 @@ function initAuth() {
             }
 
             updateAuthStrip(user);
+            try {
+                const restored = await MP.restoreRoom();
+                if (restored) {
+                    gameState.mode = 'multiplayer';
+                    gameState.myPlayerId = restored.playerId;
+                    elements.lobbyRoomCode.textContent = restored.roomCode;
+                    MP.subscribeToRoom(handleRoomUpdate);
+                    MP.subscribeToChat(handleChatUpdate);
+                }
+            } catch (error) { console.warn('Room restore failed:', error.code); }
             if (user.displayName && elements.authorNameInput) {
                 elements.authorNameInput.placeholder = user.displayName;
             }
@@ -3554,4 +3567,3 @@ window.__voiceDebug = Voice.getDebugInfo;
 
 // Start the app
 document.addEventListener('DOMContentLoaded', init);
-

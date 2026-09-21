@@ -15,6 +15,7 @@ const requiredFiles = [
   'questionCategories.js',
   'multiplayer.js',
   'multiplayerLogic.js',
+  'functions/game-logic.js',
   'league.js',
   'customCategories.js',
   'auth.js',

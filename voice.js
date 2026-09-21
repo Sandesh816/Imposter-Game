@@ -1,7 +1,7 @@
 // Voice Chat Module for Secret Word Imposter (multiplayer rooms).
 // Peer-to-peer WebRTC mesh audio; Firebase RTDB is only used for signaling:
-//   rooms/{code}/voiceUsers/{playerId}   — presence + mute state
-//   rooms/{code}/voiceSignals/{playerId} — per-player signal inbox (offer/answer/ICE)
+//   roomsV2/{code}/voiceUsers/{playerId}   — presence + mute state
+//   roomsV2/{code}/voiceSignals/{playerId} — per-player signal inbox (offer/answer/ICE)
 
 import {
     ref,
@@ -45,7 +45,7 @@ const state = {
 };
 
 function signalsRef(pid) {
-    return ref(db, `rooms/${state.roomCode}/voiceSignals/${pid}`);
+    return ref(db, `roomsV2/${state.roomCode}/voiceSignals/${pid}`);
 }
 
 function sendSignal(toPid, payload) {
@@ -267,13 +267,13 @@ export async function joinVoice(roomCode, myId, { onRoster, onSpeaking } = {}) {
     state.unsubs.push(inboxUnsub);
 
     // Announce presence (auto-removed if we disconnect)
-    const myVoiceRef = ref(db, `rooms/${roomCode}/voiceUsers/${myId}`);
+    const myVoiceRef = ref(db, `roomsV2/${roomCode}/voiceUsers/${myId}`);
     await set(myVoiceRef, { muted: false, joinedAt: state.myJoinedAt });
     onDisconnect(myVoiceRef).remove();
 
     // Roster drives the mesh: the LATER joiner initiates the connection,
     // so two clients never call each other simultaneously (no glare).
-    const rosterUnsub = onValue(ref(db, `rooms/${roomCode}/voiceUsers`), (snap) => {
+    const rosterUnsub = onValue(ref(db, `roomsV2/${roomCode}/voiceUsers`), (snap) => {
         const users = snap.exists() ? snap.val() : {};
 
         // Disconnect peers who left voice
@@ -317,7 +317,7 @@ export async function leaveVoice() {
 
     // Best-effort cleanup in RTDB (room may already be deleted)
     try {
-        await remove(ref(db, `rooms/${roomCode}/voiceUsers/${myId}`));
+        await remove(ref(db, `roomsV2/${roomCode}/voiceUsers/${myId}`));
         await remove(signalsRef(myId));
     } catch (e) { /* room gone */ }
 
@@ -330,7 +330,7 @@ export function toggleMute() {
     if (!state.joined) return false;
     state.muted = !state.muted;
     state.localStream?.getAudioTracks().forEach(t => { t.enabled = !state.muted; });
-    update(ref(db, `rooms/${state.roomCode}/voiceUsers/${state.myId}`), { muted: state.muted })
+    update(ref(db, `roomsV2/${state.roomCode}/voiceUsers/${state.myId}`), { muted: state.muted })
         .catch(() => { });
     if (state.muted) state.onSpeaking?.(state.myId, false);
     return state.muted;

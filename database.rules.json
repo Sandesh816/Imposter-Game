@@ -1,36 +1,150 @@
 {
-    "rules": {
-        "users": {
-            "$uid": {
-                ".read": "$uid === auth.uid",
-                ".write": "$uid === auth.uid"
-            }
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth !== null && auth.uid === $uid",
+        ".write": "auth !== null && auth.uid === $uid"
+      }
+    },
+    "rooms": {
+      ".read": false,
+      ".write": false
+    },
+    "roomsV2": {
+      "$code": {
+        "public": {
+          ".read": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists()"
         },
-        "rooms": {
-            ".read": "auth !== null",
-            ".write": "auth !== null"
+        "private": {
+          "$uid": {
+            ".read": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists() && auth.uid === $uid"
+          }
         },
-        "leagues": {
-            "$code": {
-                ".read": "auth !== null",
-                ".write": "auth !== null",
-                "players": {
-                    "$uid": {
-                        ".write": "$uid === auth.uid || auth !== null"
-                    }
-                }
+        "connections": {
+          "$uid": {
+            ".read": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists() && auth.uid === $uid",
+            "$connection": {
+              ".write": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists() && root.child('roomsV2').child($code).child('public/status').val() !== 'closed' && auth.uid === $uid",
+              ".validate": "newData.val() === true"
             }
+          }
         },
-        "communityCategories": {
-            ".read": true,
-            ".write": "auth !== null",
-            "$catId": {
-                "upvotedBy": {
-                    "$uid": {
-                        ".write": "$uid === auth.uid"
-                    }
-                }
+        "chat": {
+          ".read": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists()",
+          "$message": {
+            ".write": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists() && root.child('roomsV2').child($code).child('public/status').val() !== 'closed' && !data.exists() && newData.exists()",
+            ".validate": "newData.hasChildren(['playerId','playerName','text','timestamp'])",
+            "playerId": {
+              ".validate": "newData.val() === auth.uid"
+            },
+            "playerName": {
+              ".validate": "newData.isString() && newData.val() === root.child('roomsV2').child($code).child('public/players').child(auth.uid).child('name').val()"
+            },
+            "text": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+            },
+            "timestamp": {
+              ".validate": "newData.isNumber() && newData.val() <= now + 60000 && newData.val() >= now - 60000"
+            },
+            "$other": {
+              ".validate": false
             }
+          }
+        },
+        "voiceUsers": {
+          ".read": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists()",
+          "$uid": {
+            ".write": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists() && root.child('roomsV2').child($code).child('public/status').val() !== 'closed' && auth.uid === $uid",
+            ".validate": "newData.hasChildren(['muted','joinedAt'])",
+            "muted": {
+              ".validate": "newData.isBoolean()"
+            },
+            "joinedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "voiceSignals": {
+          "$uid": {
+            ".read": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists() && auth.uid === $uid",
+            ".write": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists() && auth.uid === $uid && !newData.exists()",
+            "$message": {
+              ".write": "auth !== null && root.child('roomsV2').child($code).child('members').child(auth.uid).exists() && root.child('roomsV2').child($code).child('public/status').val() !== 'closed' && root.child('roomsV2').child($code).child('members').child($uid).exists() && !data.exists() && newData.exists()",
+              ".validate": "newData.hasChildren(['from','type','data'])",
+              "from": {
+                ".validate": "newData.val() === auth.uid"
+              },
+              "type": {
+                ".validate": "newData.val() === 'offer' || newData.val() === 'answer' || newData.val() === 'candidate'"
+              },
+              "data": {
+                ".validate": "newData.isString() && newData.val().length <= 20000"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          }
         }
+      }
+    },
+    "leagues": {
+      "$code": {
+        ".read": "auth !== null && (data.child('createdBy').val() === auth.uid || data.child('members').child(auth.uid).val() === true)",
+        ".write": "auth !== null && data.child('createdBy').val() === auth.uid && !newData.exists()",
+        "updatedAt": {
+          ".write": "auth !== null && root.child('leagues').child($code).child('version').val() === 2 && (root.child('leagues').child($code).child('createdBy').val() === auth.uid || root.child('leagues').child($code).child('admins').child(auth.uid).val() === true)",
+          ".validate": "newData.isNumber()"
+        },
+        "roster": {
+          ".write": "auth !== null && root.child('leagues').child($code).child('version').val() === 2 && (root.child('leagues').child($code).child('createdBy').val() === auth.uid || root.child('leagues').child($code).child('admins').child(auth.uid).val() === true)",
+          "$player": {
+            ".validate": "newData.hasChildren(['displayName'])",
+            "displayName": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "updatedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "players": {
+          ".write": "auth !== null && root.child('leagues').child($code).child('version').val() === 2 && (root.child('leagues').child($code).child('createdBy').val() === auth.uid || root.child('leagues').child($code).child('admins').child(auth.uid).val() === true)",
+          "$player": {
+            ".validate": "newData.hasChildren(['displayName','points','gamesPlayed','wins'])",
+            "displayName": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "points": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "gamesPlayed": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "wins": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    },
+    "communityCategories": {
+      ".read": true,
+      ".write": false
     }
+  }
 }

@@ -10,7 +10,7 @@ export function resolveFirebaseEnvironment(env = {}, productionConfig) {
         config: {
             apiKey: 'demo-key', projectId: 'demo-imposter-review',
             authDomain: 'demo-imposter-review.firebaseapp.com',
-            databaseURL: 'https://demo-imposter-review-default-rtdb.firebaseio.com',
+            databaseURL: 'https://demo-imposter-review.firebaseio.com',
             appId: 'demo-imposter-review'
         }
     };
