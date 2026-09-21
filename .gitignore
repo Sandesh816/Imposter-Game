@@ -29,6 +29,8 @@ android/
 ios/
 www/
 public/legacy/
+public/categories.js
+public/questionCategories.js
 
 # Logs
 *.log
@@ -36,3 +38,7 @@ npm-debug.log*
 firebase-debug.log*
 playwright-report/
 test-results/
+
+functions/generated/
+
+/node_modules

@@ -20,53 +20,30 @@ A fun party game where players get a secret word, except for the imposter(s) who
 
 ## Local Development
 
-Simply open `index.html` in your browser, or run a local server:
+Use Node 22.12+ (Node 22), Java for Firebase emulators, and the bundled Vite application. Opening source HTML directly is no longer supported.
 
 ```bash
-# Using Python
-python -m http.server 8000
-
-# Using Node.js (npx)
-npx serve .
+npm ci
+npm ci --prefix functions
+npx playwright install chromium
+npm run verify
 ```
+
+`npm run verify` runs unit tests, isolated Auth/Database/Functions integration tests, and real Chromium games against a build of the current checkout. It finishes with a separate production build and checks its configuration. It never runs against the deployed game.
+
+For frontend development, use `npm run dev`. Normal builds use `firebase-config.js`; use an owner-controlled development project, or explicitly select the emulators with `VITE_USE_EMULATORS=1 VITE_FIREBASE_PROJECT_ID=demo-imposter-review npm run dev` while the emulators are running.
+
+The current homepage is the DOM-based `index.js` interface. `/legacy/` redirects to that same bundled application. The React migration remains unfinished.
 
 ## Firebase Deployment
 
-1. Install Firebase CLI:
-   ```bash
-   npm install -g firebase-tools
-   ```
+This version requires a coordinated Functions, rules, and client deployment. Read [the release runbook](docs/release-security-fixes.md) before changing a live project. Online room commands are disabled in production until the owner enables `serverConfig/multiplayerEnabled` after verifying the deployment.
 
-2. Login to Firebase:
-   ```bash
-   firebase login
-   ```
+[Multiplayer V2](docs/multiplayer-v2.md) documents private roles, UID membership, reconnect deadlines, and league permissions. Existing league data requires a reviewed ownership migration; do not delete it or preserve the old automatic admin grants blindly.
 
-3. Update `.firebaserc` with your project ID
+## CI Gate
 
-4. Deploy:
-   ```bash
-   firebase deploy
-   ```
-
-## CI Gate (GitHub Actions)
-
-- Workflow file: `.github/workflows/ci-deploy.yml`
-- Test gate before deployment:
-  - `npm run test:unit`
-  - `npm run test:integration`
-  - `npm run test:e2e:deployed`
-- Only after tests pass on `main`, the workflow builds and deploys Hosting.
-
-Required repository secret:
-
-- `FIREBASE_TOKEN` (GitHub Settings -> Secrets and variables -> Actions)
-
-Helpful local command (uses installed Chrome channel):
-
-```bash
-npm run test:e2e:deployed:local
-```
+GitHub Actions runs `npm run verify` against the same checkout and uploads the verified production web artifact. It does not deploy Hosting alone: release requires the matching backend/rules and the staging checks in the runbook.
 
 ## Categories Included
 

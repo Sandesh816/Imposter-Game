@@ -1,225 +1,61 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { get, push, ref, set, update } from 'firebase/database';
-import { calculateRoundPoints, calculateVoteResults } from '../../multiplayerLogic.js';
-
-const PROJECT_ID = 'imposter-sandeshg';
-
-function getDbHostPort() {
-  const raw = process.env.FIREBASE_DATABASE_EMULATOR_HOST || '127.0.0.1:9002';
-  const [host, portText] = raw.split(':');
-  const port = Number(portText);
-  return { host, port: Number.isFinite(port) ? port : 9002 };
+import { beforeAll, afterAll, beforeEach, test, expect } from 'vitest';
+import { initializeTestEnvironment, assertFails } from '@firebase/rules-unit-testing';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, connectAuthEmulator, signInAnonymously } from 'firebase/auth';
+import { getFunctions, connectFunctionsEmulator, httpsCallable } from 'firebase/functions';
+import { getDatabase, connectDatabaseEmulator, ref, set, get } from 'firebase/database';
+let env;
+const apps=[];
+beforeAll(async()=>{env=await initializeTestEnvironment({projectId:'demo-imposter-review',database:{host:'127.0.0.1',port:9002,rules:readFileSync('database.rules.json','utf8')}})});
+beforeEach(()=>env.clearDatabase());
+afterAll(async()=>{await Promise.all(apps.map(deleteApp));await env?.cleanup();});
+async function client() {
+ const app=initializeApp({projectId:'demo-imposter-review',apiKey:'demo-key',databaseURL:'https://demo-imposter-review.firebaseio.com'},randomUUID());apps.push(app);
+ const auth=getAuth(app);connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});
+ const db=getDatabase(app);connectDatabaseEmulator(db,'127.0.0.1',9002);
+ const f=getFunctions(app);connectFunctionsEmulator(f,'127.0.0.1',5001);
+ const {user}=await signInAnonymously(auth);
+ return {uid:user.uid,db,call:async(name,data)=>(await httpsCallable(f,name)(data)).data};
 }
-
-function roomSeed(hostUid) {
-  return {
-    host: hostUid,
-    status: 'lobby',
-    category: 'countries',
-    gameType: 'word',
-    secretWord: null,
-    secretQuestion: null,
-    imposterCount: 1,
-    anonymousVoting: false,
-    lastCategory: null,
-    createdAt: Date.now(),
-  };
-}
-
-let testEnv;
-
-beforeAll(async () => {
-  const { host, port } = getDbHostPort();
-  const rules = readFileSync(path.resolve(process.cwd(), 'database.rules.json'), 'utf8');
-  testEnv = await initializeTestEnvironment({
-    projectId: PROJECT_ID,
-    database: { host, port, rules },
-  });
-});
-
-afterAll(async () => {
-  await testEnv.cleanup();
-});
-
-beforeEach(async () => {
-  await testEnv.clearDatabase();
-});
-
-function dbFor(uid) {
-  return testEnv.authenticatedContext(uid).database();
-}
-
-function unauthDb() {
-  return testEnv.unauthenticatedContext().database();
-}
-
-describe('multiplayer emulator integration', () => {
-  it('enforces auth requirement for rooms read/write', async () => {
-    const guestDb = unauthDb();
-    await assertFails(set(ref(guestDb, 'rooms/AUTH01'), roomSeed('host1')));
-    await assertFails(get(ref(guestDb, 'rooms/AUTH01')));
-
-    const hostDb = dbFor('host1');
-    await assertSucceeds(set(ref(hostDb, 'rooms/AUTH01'), roomSeed('host1')));
-    const snap = await assertSucceeds(get(ref(hostDb, 'rooms/AUTH01')));
-    expect(snap.exists()).toBe(true);
-    expect(snap.val().status).toBe('lobby');
-  });
-
-  it('supports room lifecycle: lobby -> playing -> voting -> results with synced scores', async () => {
-    const roomCode = 'ROOM01';
-    const hostUid = 'host';
-    const playerAUid = 'alice';
-    const playerBUid = 'bob';
-
-    const hostDb = dbFor(hostUid);
-    const playerADb = dbFor(playerAUid);
-    const playerBDb = dbFor(playerBUid);
-
-    await assertSucceeds(set(ref(hostDb, `rooms/${roomCode}`), roomSeed(hostUid)));
-    await assertSucceeds(set(ref(hostDb, `rooms/${roomCode}/players/${hostUid}`), {
-      name: 'Host',
-      isHost: true,
-      isImposter: false,
-      hasSeenWord: false,
-      isReady: true,
-      vote: null,
-      isConnected: true,
-      joinedAt: Date.now(),
-    }));
-    await assertSucceeds(set(ref(playerADb, `rooms/${roomCode}/players/${playerAUid}`), {
-      name: 'Alice',
-      isHost: false,
-      isImposter: false,
-      hasSeenWord: false,
-      isReady: false,
-      vote: null,
-      isConnected: true,
-      joinedAt: Date.now(),
-    }));
-    await assertSucceeds(set(ref(playerBDb, `rooms/${roomCode}/players/${playerBUid}`), {
-      name: 'Bob',
-      isHost: false,
-      isImposter: false,
-      hasSeenWord: false,
-      isReady: false,
-      vote: null,
-      isConnected: true,
-      joinedAt: Date.now(),
-    }));
-
-    const lobbySeenByPlayer = await assertSucceeds(get(ref(playerADb, `rooms/${roomCode}`)));
-    expect(lobbySeenByPlayer.val().status).toBe('lobby');
-
-    const startUpdates = {
-      [`rooms/${roomCode}/status`]: 'playing',
-      [`rooms/${roomCode}/category`]: 'countries',
-      [`rooms/${roomCode}/gameType`]: 'word',
-      [`rooms/${roomCode}/secretWord`]: 'Canada',
-      [`rooms/${roomCode}/players/${hostUid}/isImposter`]: false,
-      [`rooms/${roomCode}/players/${playerAUid}/isImposter`]: false,
-      [`rooms/${roomCode}/players/${playerBUid}/isImposter`]: true,
-      [`rooms/${roomCode}/players/${hostUid}/hasSeenWord`]: false,
-      [`rooms/${roomCode}/players/${playerAUid}/hasSeenWord`]: false,
-      [`rooms/${roomCode}/players/${playerBUid}/hasSeenWord`]: false,
-      [`rooms/${roomCode}/players/${hostUid}/isReady`]: false,
-      [`rooms/${roomCode}/players/${playerAUid}/isReady`]: false,
-      [`rooms/${roomCode}/players/${playerBUid}/isReady`]: false,
-      [`rooms/${roomCode}/players/${hostUid}/vote`]: null,
-      [`rooms/${roomCode}/players/${playerAUid}/vote`]: null,
-      [`rooms/${roomCode}/players/${playerBUid}/vote`]: null,
-    };
-    await assertSucceeds(update(ref(hostDb), startUpdates));
-
-    await assertSucceeds(update(ref(hostDb, `rooms/${roomCode}/players/${hostUid}`), { hasSeenWord: true, isReady: true }));
-    await assertSucceeds(update(ref(playerADb, `rooms/${roomCode}/players/${playerAUid}`), { hasSeenWord: true, isReady: true }));
-    await assertSucceeds(update(ref(playerBDb, `rooms/${roomCode}/players/${playerBUid}`), { hasSeenWord: true, isReady: true }));
-
-    await assertSucceeds(update(ref(hostDb, `rooms/${roomCode}`), { status: 'voting' }));
-    await assertSucceeds(update(ref(hostDb, `rooms/${roomCode}/players/${hostUid}`), { vote: playerBUid }));
-    await assertSucceeds(update(ref(playerADb, `rooms/${roomCode}/players/${playerAUid}`), { vote: playerBUid }));
-    await assertSucceeds(update(ref(playerBDb, `rooms/${roomCode}/players/${playerBUid}`), { vote: hostUid }));
-
-    const playersSnap = await assertSucceeds(get(ref(hostDb, `rooms/${roomCode}/players`)));
-    const players = playersSnap.val();
-    const voteResults = calculateVoteResults(players);
-    const pointsMap = calculateRoundPoints(players, voteResults);
-
-    expect(voteResults.eliminated).toBe(playerBUid);
-    expect(voteResults.imposterWins).toBe(false);
-    expect(pointsMap).toEqual({
-      [hostUid]: 1,
-      [playerAUid]: 1,
-      [playerBUid]: 0,
-    });
-
-    const resultUpdates = {
-      [`rooms/${roomCode}/status`]: 'results',
-      [`rooms/${roomCode}/scores/${hostUid}`]: pointsMap[hostUid],
-      [`rooms/${roomCode}/scores/${playerAUid}`]: pointsMap[playerAUid],
-      [`rooms/${roomCode}/scores/${playerBUid}`]: pointsMap[playerBUid],
-    };
-    await assertSucceeds(update(ref(hostDb), resultUpdates));
-
-    const roomFromHost = await assertSucceeds(get(ref(hostDb, `rooms/${roomCode}`)));
-    const roomFromPlayer = await assertSucceeds(get(ref(playerBDb, `rooms/${roomCode}`)));
-
-    expect(roomFromHost.val().status).toBe('results');
-    expect(roomFromPlayer.val().status).toBe('results');
-    expect(roomFromHost.val().scores).toEqual({
-      [hostUid]: 1,
-      [playerAUid]: 1,
-      [playerBUid]: 0,
-    });
-  });
-
-  it('synchronizes multiplayer chat messages for authenticated clients', async () => {
-    const roomCode = 'CHAT01';
-    const hostDb = dbFor('host');
-    const playerDb = dbFor('player');
-
-    await assertSucceeds(set(ref(hostDb, `rooms/${roomCode}`), roomSeed('host')));
-    await assertSucceeds(set(ref(hostDb, `rooms/${roomCode}/players/host`), {
-      name: 'Host',
-      isHost: true,
-      isImposter: false,
-      hasSeenWord: false,
-      isReady: true,
-      vote: null,
-      isConnected: true,
-      joinedAt: Date.now(),
-    }));
-    await assertSucceeds(set(ref(playerDb, `rooms/${roomCode}/players/player`), {
-      name: 'Player',
-      isHost: false,
-      isImposter: false,
-      hasSeenWord: false,
-      isReady: false,
-      vote: null,
-      isConnected: true,
-      joinedAt: Date.now(),
-    }));
-
-    const chatRef = ref(hostDb, `rooms/${roomCode}/chat`);
-    await assertSucceeds(push(chatRef, {
-      playerId: 'host',
-      playerName: 'Host',
-      text: 'hello team',
-      timestamp: Date.now(),
-    }));
-    await assertSucceeds(push(chatRef, {
-      playerId: 'player',
-      playerName: 'Player',
-      text: 'ready',
-      timestamp: Date.now() + 1,
-    }));
-
-    const chatSnap = await assertSucceeds(get(ref(playerDb, `rooms/${roomCode}/chat`)));
-    const messages = Object.values(chatSnap.val() || {});
-    const texts = messages.map((m) => m.text).sort();
-    expect(texts).toEqual(['hello team', 'ready']);
-  });
-});
+const invoke=(client,action,code,payload={},roundId=null)=>client.call('roomCommand',{commandId:randomUUID(),action,...(code?{code}:{}),payload,roundId});
+async function waitFor(check) { for(let i=0;i<100;i++){if(await check())return;await new Promise(r=>setTimeout(r,100));}throw new Error('Timed out waiting for emulator trigger'); }
+test('real callable lifecycle preserves secrets and recovers the same player',async()=>{
+ const [host,alice,bob,outsider]=await Promise.all([client(),client(),client(),client()]);
+ const created=await invoke(host,'create',null,{name:'Host'}),code=created.code;
+ await invoke(alice,'join',code,{name:'Alice'});await invoke(bob,'join',code,{name:'Bob'});
+ for(const person of [host,alice,bob])await set(ref(person.db,`roomsV2/${code}/connections/${person.uid}/tab1`),true);
+ await waitFor(async()=>Object.values((await get(ref(host.db,`roomsV2/${code}/public/players`))).val()).every(p=>p.isConnected));
+ await invoke(alice,'toggleReady',code);await invoke(bob,'toggleReady',code);
+ await expect(invoke(alice,'start',code)).rejects.toThrow(/host/);
+ await assertFails(get(ref(outsider.db,`roomsV2/${code}/public`)));
+ const started=await invoke(host,'start',code),round=started.roundId;
+ const privateViews=await Promise.all([host,alice,bob].map(p=>get(ref(p.db,`roomsV2/${code}/private/${p.uid}`)).then(s=>s.val())));
+ expect(privateViews.filter(v=>v.isImposter)).toHaveLength(1);
+ expect(privateViews.find(v=>v.isImposter).secretWord).toBeUndefined();
+ await assertFails(get(ref(host.db,`roomsV2/${code}/private/${alice.uid}`)));
+ await invoke(alice,'join',code,{name:'Alice'});
+ expect((await get(ref(alice.db,`roomsV2/${code}/private/${alice.uid}`))).val()).toEqual(privateViews[1]);
+ for(const p of [host,alice,bob]){await invoke(p,'seen',code,{},round);await invoke(p,'ready',code,{},round);}
+ await invoke(host,'startVoting',code,{},round);
+ for(const p of [host,alice,bob])await invoke(p,'vote',code,{target:'skip'},round);
+ const publicResult=(await get(ref(host.db,`roomsV2/${code}/public`))).val();
+ expect(publicResult.status).toBe('results');expect(publicResult.results.imposterWins).toBe(true);
+ expect(Object.values(publicResult.results.points).reduce((a,b)=>a+b,0)).toBe(1);
+ await invoke(host,'nextRound',code);
+ const snapshot=(await get(ref(host.db,`roomsV2/${code}/public`))).val();
+ expect(snapshot.secretWord).toBeUndefined();expect(snapshot.results).toBeUndefined();
+},60000);
+test('league join cannot elevate privileges; category votes are idempotent across requests',async()=>{
+ const [owner,guest]=await Promise.all([client(),client()]);
+ const league=await owner.call('leagueCommand',{commandId:randomUUID(),action:'create',payload:{name:'Friends',roster:[]}});
+ await guest.call('leagueCommand',{commandId:randomUUID(),action:'join',code:league.code,payload:{}});
+ const data=(await get(ref(guest.db,`leagues/${league.code}`))).val();
+ expect(data.members[guest.uid]).toBe(true);expect(data.admins[guest.uid]).toBeUndefined();
+ await assertFails(set(ref(guest.db,`leagues/${league.code}/admins/${guest.uid}`),true));
+ const category=await owner.call('categoryCommand',{commandId:randomUUID(),action:'publish',payload:{name:'Places',words:['Canada','Japan','Egypt']}});
+ const vote=()=>guest.call('categoryCommand',{commandId:randomUUID(),action:'upvote',categoryId:category.id,payload:{}});
+ await vote();expect((await vote()).newCount).toBe(1);
+ await assertFails(set(ref(guest.db,`communityCategories/${category.id}/name`),'Changed'));
+},60000);

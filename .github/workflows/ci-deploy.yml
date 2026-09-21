@@ -1,100 +1,48 @@
-name: CI and Deploy
-
+name: Verify game
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
-
-concurrency:
-  group: ci-deploy-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
-
-env:
-  PLAYWRIGHT_BASE_URL: https://imposter-sandeshg.web.app
-
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   tests:
-    name: Unit + Integration + E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
+    timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run unit tests
-        run: npm run test:unit
-
-      - name: Run Firebase emulator integration tests
-        run: npm run test:integration
-
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
-
-      - name: Run deployed multiplayer E2E
-        run: npm run test:e2e:deployed
-
-      - name: Upload Playwright artifacts on failure
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm ci --prefix functions
+      - run: npx playwright install --with-deps chromium
+      - run: npm run verify
+      - name: Save verified production build
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-web
+          path: www
+      - name: Save failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-artifacts
+          name: test-evidence
           path: |
             playwright-report
             test-results
           if-no-files-found: ignore
           retention-days: 7
-
-  deploy:
-    name: Deploy Firebase Hosting
-    needs: tests
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Check Firebase token
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-        run: |
-          if [ -z "$FIREBASE_TOKEN" ]; then
-            echo "Missing FIREBASE_TOKEN repository secret."
-            echo "Add it under Settings > Secrets and variables > Actions."
-            exit 1
-          fi
-
-      - name: Deploy to Firebase Hosting
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-        run: npx firebase-tools deploy --project imposter-sandeshg --only hosting --token "$FIREBASE_TOKEN" --non-interactive
+# Release the matching Functions, rules, and web build together after the
+# owner completes docs/release-security-fixes.md. Hosting-only auto-deployment
+# would leave the old database permissions or deploy an unusable V2 client.

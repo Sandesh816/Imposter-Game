@@ -4,9 +4,7 @@
 // No account linking — each Google account is independent
 // ===============================================
 
-import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
-    getAuth,
     GoogleAuthProvider,
     signInWithPopup,
     getAdditionalUserInfo,
@@ -14,27 +12,16 @@ import {
     onAuthStateChanged,
     signOut as firebaseSignOut,
     updateProfile
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+} from "firebase/auth";
 import {
-    getDatabase,
     ref,
     set,
     get,
     update
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+} from "firebase/database";
 
-import { firebaseConfig } from "./firebase-config.js";
+import { database as db, auth } from './firebase-client.js';
 
-// Re-use existing Firebase app instance if available
-let authApp;
-try {
-    authApp = getApp();
-} catch {
-    authApp = initializeApp(firebaseConfig);
-}
-
-const auth = getAuth(authApp);
-const db = getDatabase(authApp);
 const googleProvider = new GoogleAuthProvider();
 
 function redirectLocalIpToLocalhost() {

@@ -24,7 +24,7 @@ Move all game logic and UI to React without breaking existing behavior.
 - Manual smoke pass: local game, multiplayer room create/join, voting, results.
 
 ## Current Status
-- React app shell is active.
+- The shipped homepage still uses the DOM application (`index.js`). React migration is incomplete; its shell is not the production entry point.
 - Core local round logic extracted to shared engine:
   - `gameEngine.js`
 - Legacy app now uses extracted engine for round creation.

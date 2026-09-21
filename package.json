@@ -7,17 +7,18 @@
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/unit",
     "test:unit:watch": "vitest tests/unit",
-    "test:integration": "npx firebase-tools emulators:exec --only database --project imposter-sandeshg \"vitest run tests/integration\"",
+    "test:integration": "npm run build:server && firebase emulators:exec --config firebase.test.json --only auth,database,functions --project demo-imposter-review \"vitest run tests/integration\"",
     "test:integration:local": "vitest run tests/integration",
-    "test:e2e": "playwright test",
-    "test:e2e:deployed": "PLAYWRIGHT_BASE_URL=https://imposter-sandeshg.web.app playwright test tests/e2e/multiplayer.deployed.spec.cjs",
-    "test:e2e:deployed:local": "PLAYWRIGHT_BASE_URL=https://imposter-sandeshg.web.app PLAYWRIGHT_CHROMIUM_CHANNEL=chrome playwright test tests/e2e/multiplayer.deployed.spec.cjs",
+    "test:e2e": "npm run build:server && npm run build:test && firebase emulators:exec --config firebase.test.json --only auth,database,functions --project demo-imposter-review \"playwright test\"",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:install": "playwright install chromium",
     "sync:legacy": "node scripts/sync-legacy-assets.mjs",
     "dev": "npm run sync:legacy && vite",
     "build": "npm run sync:legacy && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:test": "VITE_USE_EMULATORS=1 VITE_FIREBASE_PROJECT_ID=demo-imposter-review npm run build",
+    "build:server": "node scripts/build-server-data.mjs",
+    "verify": "npm test && npm run build:server && npm run build:test && firebase emulators:exec --config firebase.test.json --only auth,database,functions --project demo-imposter-review \"vitest run tests/integration && playwright test\" && npm run build && node scripts/check-production.mjs"
   },
   "repository": {
     "type": "git",
@@ -48,6 +49,10 @@
     "@vitejs/plugin-react": "^5.1.4",
     "firebase": "^10.8.0",
     "vite": "^7.3.1",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "acorn": "^8.15.0"
+  },
+  "engines": {
+    "node": ">=22.12.0 <23"
   }
 }

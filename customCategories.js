@@ -1,3 +1,4 @@
+import { httpsCallable } from 'firebase/functions';
 // ===============================================
 // Custom Categories Module
 // Personal: Firebase RTDB users/{uid}/customCategories/
@@ -5,30 +6,16 @@
 // localStorage used as cache/fallback only
 // ===============================================
 
-import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
-    getDatabase,
     ref,
     set,
     get,
     update,
     remove,
     push
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+} from "firebase/database";
 
-import { firebaseConfig } from "./firebase-config.js";
-
-// Re-use auth-app (shared Firebase app instance)
-let catApp;
-try {
-    catApp = getApp();
-} catch {
-    catApp = initializeApp(firebaseConfig);
-}
-
-const db = getDatabase(catApp);
-const auth = getAuth(catApp);
+import { functions, database as db, auth } from './firebase-client.js';
 
 // ---- Keys ----
 const LOCAL_KEY = 'imposter-custom-categories'; // localStorage cache/fallback
@@ -146,29 +133,11 @@ function _getCachedCategories() {
  * Returns the new Firebase key.
  */
 async function publishCategory(category, authorName = 'Anonymous') {
-    const uid = currentUid();
-    const communityRef = ref(db, 'communityCategories');
-    const newRef = push(communityRef);
-
-    const payload = {
-        name: category.name.trim(),
-        icon: category.icon || '📝',
-        words: category.words.filter(w => w.trim().length > 0),
-        authorName: (authorName || 'Anonymous').trim(),
-        authorUid: uid || null,
-        upvotes: 0,
-        importCount: 0,
-        publishedAt: Date.now()
-    };
-
-    await set(newRef, payload);
-
-    // Mark locally as published
-    category.communityId = newRef.key;
-    category.publishedAt = payload.publishedAt;
+    const result = await httpsCallable(functions,'categoryCommand')({action:'publish',commandId:crypto.randomUUID(),payload:{name:category.name,icon:category.icon||'📝',words:category.words,authorName}});
+    category.communityId=result.data.id;
+    category.publishedAt=Date.now();
     await saveLocalCategory(category);
-
-    return newRef.key;
+    return result.data.id;
 }
 
 /**
@@ -176,26 +145,8 @@ async function publishCategory(category, authorName = 'Anonymous') {
  * Sorts by newest first.
  */
 async function fetchCommunityCategories() {
-    const dbUrl = 'https://imposter-sandeshg-default-rtdb.firebaseio.com';
-
-    try {
-        const res = await fetch(`${dbUrl}/communityCategories.json`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (!data) return [];
-
-        const results = Object.entries(data).map(([id, val]) => ({ id, ...val }));
-        results.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
-        return results.slice(0, 100);
-    } catch (err) {
-        console.error('[Community] REST fetch failed, trying SDK...', err);
-        const snap = await get(ref(db, 'communityCategories'));
-        if (!snap.exists()) return [];
-        const results = [];
-        snap.forEach(child => results.push({ id: child.key, ...child.val() }));
-        results.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
-        return results.slice(0, 100);
-    }
+    const snap=await get(ref(db,'communityCategories'));
+    return Object.entries(snap.val()||{}).map(([id,value])=>({id,...value})).sort((a,b)=>(b.publishedAt||0)-(a.publishedAt||0)).slice(0,100);
 }
 
 /**
@@ -204,38 +155,9 @@ async function fetchCommunityCategories() {
  * Returns { newCount, alreadyVoted }.
  */
 async function upvoteCategory(communityId) {
-    const uid = currentUid();
-    const catRef = ref(db, `communityCategories/${communityId}`);
-
-    // Check Firebase-based deduplication first (for authenticated users)
-    if (uid) {
-        const upvoteRef = ref(db, `communityCategories/${communityId}/upvotedBy/${uid}`);
-        const upvoteSnap = await get(upvoteRef);
-        if (upvoteSnap.exists()) {
-            return { alreadyVoted: true };
-        }
-    } else {
-        // Guest: localStorage fallback
-        const upvoted = _getLocalUpvotedIds();
-        if (upvoted.has(communityId)) return { alreadyVoted: true };
-    }
-
-    const snap = await get(catRef);
-    if (!snap.exists()) throw new Error('Category not found.');
-
-    const current = snap.val().upvotes || 0;
-    const newCount = current + 1;
-
-    const updates = { upvotes: newCount };
-    if (uid) updates[`upvotedBy/${uid}`] = true;
-    await update(catRef, updates);
-
-    // Also track in localStorage for guests / fallback
-    const localUpvoted = _getLocalUpvotedIds();
-    localUpvoted.add(communityId);
-    _saveLocalUpvotedIds(localUpvoted);
-
-    return { newCount, alreadyVoted: false };
+    const result=await httpsCallable(functions,'categoryCommand')({action:'upvote',categoryId:communityId,commandId:crypto.randomUUID(),payload:{}});
+    const cached=_getLocalUpvotedIds();cached.add(communityId);_saveLocalUpvotedIds(cached);
+    return result.data;
 }
 
 /**
@@ -248,7 +170,7 @@ async function importCategory(communityId) {
     if (!snap.exists()) throw new Error('Category not found.');
 
     const data = snap.val();
-    await update(catRef, { importCount: (data.importCount || 0) + 1 });
+    await httpsCallable(functions,'categoryCommand')({action:'import',categoryId:communityId,commandId:crypto.randomUUID(),payload:{}});
 
     const local = {
         name: data.name,
@@ -264,12 +186,8 @@ async function importCategory(communityId) {
 /**
  * Check whether the current user has already upvoted a community category.
  */
-async function hasUpvoted(communityId) {
-    const uid = currentUid();
-    if (uid) {
-        const snap = await get(ref(db, `communityCategories/${communityId}/upvotedBy/${uid}`));
-        return snap.exists();
-    }
+function hasUpvoted(communityId) {
+    // Immediate UI hint only; the service is authoritative across devices.
     return _getLocalUpvotedIds().has(communityId);
 }
 

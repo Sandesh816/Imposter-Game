@@ -1,3 +1,4 @@
+import { html } from './ui/safe-text.js';
 // Secret Word Imposter Game - Main Game Logic
 // Supports both Local and Multiplayer modes
 
@@ -448,7 +449,7 @@ function createPlayerElement(index, name = '') {
     playerItem.dataset.index = index;
     playerItem.style.setProperty('--i', index);
 
-    playerItem.innerHTML = `
+    playerItem.innerHTML = html`
     <div class="player-number">${avatar}</div>
     <input 
       type="text" 
@@ -536,7 +537,7 @@ function updateMPImposterLimits(playerCount) {
 
     if (gameState.mpImposterCount > maxImposters) {
         gameState.mpImposterCount = maxImposters;
-        MP.updateImposterCount(maxImposters);
+        if (MP.isHost() && ['lobby','results'].includes(gameState.roomData?.status)) MP.updateImposterCount(maxImposters).catch(console.warn);
     }
 
     if (elements.mpImposterMinus) {
@@ -563,7 +564,7 @@ function renderCategories(targetGrid = elements.categoryGrid, callback = selectC
                 card.className = 'category-card';
                 card.dataset.category = 'q:' + key;
                 card.style.setProperty('--i', cardIndex++);
-                card.innerHTML = `
+                card.innerHTML = html`
           <div class="category-icon">${category.icon}</div>
           <div class="category-name">${category.name}</div>
           <div class="category-count">${category.questions?.length || 0} questions</div>
@@ -583,7 +584,7 @@ function renderCategories(targetGrid = elements.categoryGrid, callback = selectC
         const key = 'custom:' + cat.id;
         card.dataset.category = key;
         card.style.setProperty('--i', cardIndex++);
-        card.innerHTML = `
+        card.innerHTML = html`
       <div class="category-icon">${cat.icon || '📝'}</div>
       <div class="category-name">${cat.name}</div>
       <div class="category-count">${cat.words.length} words</div>
@@ -598,7 +599,7 @@ function renderCategories(targetGrid = elements.categoryGrid, callback = selectC
         card.className = 'category-card';
         card.dataset.category = key;
         card.style.setProperty('--i', cardIndex++);
-        card.innerHTML = `
+        card.innerHTML = html`
       <div class="category-icon">${category.icon}</div>
       <div class="category-name">${category.name}</div>
       <div class="category-count">${category.words.length} words</div>
@@ -854,7 +855,7 @@ function showGameScreen() {
         const card = document.createElement('div');
         card.className = 'game-player-card';
         card.style.setProperty('--i', index);
-        card.innerHTML = `
+        card.innerHTML = html`
       <div class="game-player-avatar">${avatars[index % avatars.length]}</div>
       <div class="game-player-name">${player}</div>
     `;
@@ -1023,7 +1024,7 @@ function revealAnswer() {
         card.className = 'vote-player-card';
         card.dataset.index = index;
         card.style.setProperty('--i', index);
-        card.innerHTML = `
+        card.innerHTML = html`
             <div class="vote-player-avatar">${avatars[index % avatars.length]}</div>
             <div class="vote-player-name">${player}</div>
         `;
@@ -1058,7 +1059,7 @@ function modalConfirmVote() {
         const name = gameState.players[idx];
         const wrapper = document.createElement('div');
         wrapper.className = 'imposter-guess-item';
-        wrapper.innerHTML = `
+        wrapper.innerHTML = html`
             <label class="guess-label">🕵️ ${name}'s guess:</label>
             <input type="text" class="form-input guess-input" data-index="${idx}" placeholder="Type the secret word..." maxlength="50" autocomplete="off">
         `;
@@ -1176,7 +1177,7 @@ function finalizeLeaguePoints() {
     gameState.imposterIndices.forEach(index => {
         const tag = document.createElement('span');
         tag.className = 'imposter-tag';
-        tag.innerHTML = `🕵️ ${gameState.players[index]}`;
+        tag.innerHTML = html`🕵️ ${gameState.players[index]}`;
         elements.impostersList.appendChild(tag);
     });
 
@@ -1194,7 +1195,7 @@ function finalizeLeaguePoints() {
             const correct = guessResults[idx];
             const div = document.createElement('div');
             div.className = `guess-result ${correct ? 'correct' : 'wrong'}`;
-            div.innerHTML = `${gameState.players[idx]}: "${guess}" ${correct ? '✅' : '❌'}`;
+            div.innerHTML = html`${gameState.players[idx]}: "${guess}" ${correct ? '✅' : '❌'}`;
             elements.guessResultsSection.appendChild(div);
         });
     }
@@ -1207,7 +1208,7 @@ function finalizeLeaguePoints() {
         const row = document.createElement('div');
         row.className = `points-row ${entry.points > 0 ? 'earned' : ''}`;
         const reasonText = entry.reasons.length > 0 ? entry.reasons.join(', ') : '—';
-        row.innerHTML = `
+        row.innerHTML = html`
             <span class="points-player">${avatars[idx % avatars.length]} ${name}</span>
             <span class="points-reason">${reasonText}</span>
             <span class="points-value ${entry.points > 0 ? 'positive' : ''}">+${entry.points}</span>
@@ -1272,11 +1273,11 @@ async function buildLeagueSelector(pointsMap, correctVote, imposterSet) {
 
         const label = document.createElement('label');
         label.className = `league-checkbox-item ${!allPresent ? 'disabled' : ''}`;
-        label.innerHTML = `
+        label.innerHTML = html`
             <input type="checkbox" value="${league.code}" ${allPresent ? 'checked' : 'disabled'}>
             <span class="league-checkbox-name">🏆 ${league.name}</span>
             <span class="league-checkbox-code">${league.code}</span>
-            ${!allPresent ? `<span class="league-missing">Missing: ${missingMembers.join(', ')}</span>` : ''}
+            ${!allPresent ? html`<span class="league-missing">Missing: ${missingMembers.join(', ')}</span>` : ''}
         `;
         elements.leagueCheckboxList.appendChild(label);
     });
@@ -1333,7 +1334,7 @@ async function renderLeagueHub() {
     leagues.forEach(league => {
         const card = document.createElement('div');
         card.className = 'league-hub-card';
-        card.innerHTML = `
+        card.innerHTML = html`
             <div class="league-hub-card-info">
                 <span class="league-hub-card-name">🏆 ${league.name}</span>
                 <span class="league-hub-card-code">${league.code}</span>
@@ -1438,7 +1439,7 @@ async function renderLeagueDetail(code) {
         const rank = index < 3 ? medals[index] : `${index + 1}`;
         const winRate = player.gamesPlayed > 0 ? Math.round((player.wins / player.gamesPlayed) * 100) : 0;
 
-        row.innerHTML = `
+        row.innerHTML = html`
             <span class="league-rank">${rank}</span>
             <span class="league-name">${player.name}</span>
             <span class="league-stat league-points">${player.points} pts</span>
@@ -1576,7 +1577,7 @@ function confirmLeaveRoom() {
             : 'Leave and close the room for everyone?';
     } else {
         msg = midRound
-            ? 'Leave mid-round? You won\'t be able to rejoin until the next game.'
+            ? 'Leave mid-round? This round will be cancelled without points for everyone.'
             : 'Leave the room?';
     }
     if (confirm(msg)) leaveRoom();
@@ -1632,6 +1633,10 @@ function handleRoomUpdate(data) {
     // Update lobby UI
     updateLobbyUI(data, isHost, players, playerCount);
 
+    let notice = document.getElementById('room-status-notice');
+    if (!notice) { notice = document.createElement('div'); notice.id = 'room-status-notice'; notice.setAttribute('role','status'); document.body.append(notice); }
+    notice.textContent = data.paused ? 'Waiting for a player to reconnect (up to 60 seconds)…' : (data.message || '');
+    notice.hidden = !notice.textContent;
     // Handle status transitions
     switch (data.status) {
         case 'lobby':
@@ -1691,11 +1696,11 @@ function updateLobbyUI(data, isHost, players, playerCount) {
         const isYou = pid === gameState.myPlayerId;
         const div = document.createElement('div');
         div.className = `lobby-player ${isYou ? 'is-you' : ''} ${player.isReady ? 'ready' : ''}`;
-        div.innerHTML = `
+        div.innerHTML = html`
             <div class="lobby-player-avatar">${avatars[index % avatars.length]}</div>
             <div class="lobby-player-name">${player.name}${isYou ? ' (You)' : ''}</div>
-            ${player.isHost ? '<span class="lobby-player-badge">Host</span>' : ''}
-            ${!player.isHost && player.isReady ? '<span class="lobby-player-badge ready-badge">Ready ✓</span>' : ''}
+            ${player.isHost ? html`<span class="lobby-player-badge">Host</span>` : ''}
+            ${!player.isHost && player.isReady ? html`<span class="lobby-player-badge ready-badge">Ready ✓</span>` : ''}
             <div class="lobby-player-status ${player.isConnected ? '' : 'disconnected'}"></div>
         `;
         elements.lobbyPlayersList.appendChild(div);
@@ -1744,7 +1749,7 @@ function updateLobbyUI(data, isHost, players, playerCount) {
         elements.mpImposterSettings.classList.remove('hidden');
 
         // Host is always ready. Check if others are ready.
-        const allReady = Object.values(players).every(p => p.isReady);
+        const allReady = Object.values(players).every(p => p.isReady && p.isConnected);
         elements.mpStartGameBtn.disabled = playerCount < 3 || !allReady;
 
         if (playerCount < 3) {
@@ -1945,7 +1950,7 @@ function updateWordScreenStatus(data) {
     const ready = Object.values(players).filter(p => p.isReady).length;
 
     elements.mpPlayersSeen.textContent = `${seen} of ${total} have seen their word. ${ready} ready.`;
-    elements.mpReadyBtn.disabled = !myPlayer?.hasSeenWord;
+    elements.mpReadyBtn.disabled = data.paused || myPlayer?.isReady || !myPlayer?.hasSeenWord;
 }
 
 function toggleMPReveal() {
@@ -1975,9 +1980,9 @@ function checkAllReady(data) {
     const gameType = data.gameType || 'word';
     const players = Object.values(data.players);
 
-    const allReady = gameType === 'question'
+    const allReady = !data.paused && (data.discussionReady ?? (gameType === 'question'
         ? players.every(p => p.hasSeenWord && p.answer) // All submitted answers
-        : players.every(p => p.isReady);
+        : players.every(p => p.isReady)));
 
     if (allReady && players.length >= 3) {
         updateDiscussionScreen(data);
@@ -2043,7 +2048,7 @@ function updateDiscussionScreen(data) {
         const isYou = pid === gameState.myPlayerId;
         const card = document.createElement('div');
         card.className = `mp-player-card ${isYou ? 'is-you' : ''}`;
-        card.innerHTML = `
+        card.innerHTML = html`
             <div class="mp-player-avatar">${avatars[index % avatars.length]}</div>
             <div class="mp-player-name">${player.name}</div>
         `;
@@ -2060,7 +2065,7 @@ function updateDiscussionScreen(data) {
         .sort(([pidA], [pidB]) => pidA.localeCompare(pidB))
         .map(([pid, p]) => ({ pid, name: p.name }));
 
-    const seedString = data.roomCode + (data.secretWord || '') + (data.createdAt || '') + (data.imposterCount || 1);
+    const seedString = data.roomCode + (data.roundId || data.createdAt || '');
 
     // Deterministic shuffle
     const shuffledPlayers = seededShuffle(playersList, seedString);
@@ -2130,7 +2135,7 @@ function updateVotingScreen(data) {
         const card = document.createElement('div');
         card.className = `voting-card ${isYou ? 'is-you' : ''}`;
         card.dataset.playerId = pid;
-        card.innerHTML = `
+        card.innerHTML = html`
             <div class="voting-avatar">${avatars[index % avatars.length]}</div>
             <div class="voting-name">${player.name}</div>
             <div class="voting-vote-count"></div>
@@ -2158,6 +2163,11 @@ function updateVotingStatus(data) {
     cards.forEach(card => {
         const pid = card.dataset.playerId;
         const player = players[pid];
+        if (!player) {
+            card.remove();
+            if (gameState.selectedVote === pid) gameState.selectedVote = null;
+            return;
+        }
         if (player.vote) {
             card.classList.add('has-voted');
         } else {
@@ -2167,7 +2177,7 @@ function updateVotingStatus(data) {
 
     // Show waiting message if you've voted
     const myPlayer = players[gameState.myPlayerId];
-    if (myPlayer.vote) {
+    if (myPlayer?.vote || data.paused) {
         elements.voteWaiting.classList.remove('hidden');
         elements.submitVoteBtn.disabled = true;
         elements.skipVoteBtn.disabled = true;
@@ -2188,7 +2198,7 @@ function updateVotingStatus(data) {
                 if (votedFor) {
                     const div = document.createElement('div');
                     div.className = 'live-vote-item';
-                    div.innerHTML = `
+                    div.innerHTML = html`
                         <span class="voter">${player.name}</span>
                         <span>voted for</span>
                         <span class="voted-for">${votedFor.name}</span>
@@ -2198,7 +2208,7 @@ function updateVotingStatus(data) {
             } else if (player.vote === 'skip') {
                 const div = document.createElement('div');
                 div.className = 'live-vote-item';
-                div.innerHTML = `
+                div.innerHTML = html`
                     <span class="voter">${player.name}</span>
                     <span>skipped</span>
                 `;
@@ -2257,7 +2267,8 @@ function checkAllVoted(data) {
 // MULTIPLAYER MODE - Results Screen
 // ===============================================
 function updateResultsScreen(data, celebrate = false) {
-    const results = MP.calculateVoteResults(data.players);
+    const results = data.results || MP.calculateVoteResults(data.players);
+    const resultPlayers = results.players || data.players;
     const avatars = getPlayerAvatars();
 
     // Update header
@@ -2272,7 +2283,7 @@ function updateResultsScreen(data, celebrate = false) {
     }
 
     if (celebrate) {
-        const me = data.players[gameState.myPlayerId];
+        const me = resultPlayers[gameState.myPlayerId];
         const iWon = results.imposterWins ? !!me?.isImposter : !me?.isImposter;
         if (iWon) {
             FX.play('fanfare');
@@ -2297,25 +2308,23 @@ function updateResultsScreen(data, celebrate = false) {
 
     // Show imposters
     elements.resultsImposters.innerHTML = '';
-    const playerIds = Object.keys(data.players);
-
     results.imposterIds.forEach(pid => {
-        const player = data.players[pid];
+        const player = resultPlayers[pid];
         const tag = document.createElement('span');
         tag.className = 'imposter-tag';
-        tag.innerHTML = `🕵️ ${player.name}`;
+        tag.innerHTML = html`🕵️ ${player?.name || 'Departed player'}`;
         elements.resultsImposters.appendChild(tag);
     });
 
     // Show vote distribution
     elements.voteResults.innerHTML = '';
     let index = 0;
-    Object.entries(data.players).forEach(([pid, player]) => {
-        const votesReceived = results.votes[pid] || 0;
+    Object.entries(resultPlayers).forEach(([pid, player]) => {
+        const votesReceived = results.votes?.[pid] || 0;
         if (votesReceived > 0 || pid === results.eliminated) {
             const item = document.createElement('div');
             item.className = `vote-result-item ${pid === results.eliminated ? 'eliminated' : ''}`;
-            item.innerHTML = `${avatars[index % avatars.length]} ${player.name}: ${votesReceived} vote${votesReceived !== 1 ? 's' : ''}`;
+            item.innerHTML = html`${avatars[index % avatars.length]} ${player.name}: ${votesReceived} vote${votesReceived !== 1 ? 's' : ''}`;
             elements.voteResults.appendChild(item);
         }
         index++;
@@ -2324,7 +2333,7 @@ function updateResultsScreen(data, celebrate = false) {
     if (results.skippedVotes > 0) {
         const skipItem = document.createElement('div');
         skipItem.className = 'vote-result-item';
-        skipItem.innerHTML = `⏭️ Skipped: ${results.skippedVotes}`;
+        skipItem.innerHTML = html`⏭️ Skipped: ${results.skippedVotes}`;
         elements.voteResults.appendChild(skipItem);
     }
 
@@ -2348,13 +2357,13 @@ function updateResultsScreen(data, celebrate = false) {
     Object.entries(data.players).forEach(([pid, player]) => {
         const isYou = pid === gameState.myPlayerId;
         const statusBadge = player.isHost
-            ? '<span class="lobby-player-badge">Host</span>'
+            ? html`<span class="lobby-player-badge">Host</span>`
             : (player.isReady
-                ? '<span class="lobby-player-badge ready-badge">Ready ✓</span>'
-                : '<span class="lobby-player-badge waiting-badge">Not ready</span>');
+                ? html`<span class="lobby-player-badge ready-badge">Ready ✓</span>`
+                : html`<span class="lobby-player-badge waiting-badge">Not ready</span>`);
         const div = document.createElement('div');
         div.className = 'lobby-player-item';
-        div.innerHTML = `
+        div.innerHTML = html`
             <div class="lobby-player-avatar">${avatars[rIndex % avatars.length]}</div>
             <div class="lobby-player-info">
                 <span class="lobby-player-name">${player.name}${isYou ? ' (You)' : ''}</span>
@@ -2387,7 +2396,7 @@ function updateResultsScreen(data, celebrate = false) {
         elements.mpResultsReadyBtn?.classList.add('hidden');
         elements.mpNewRoundBtn?.classList.remove('hidden');
 
-        const canStart = totalPlayers >= 3 && allOthersReady;
+        const canStart = totalPlayers >= 3 && allOthersReady && playerEntries.every(([,p])=>p.isConnected);
         elements.mpNewRoundBtn.disabled = !canStart;
         if (elements.mpNewRoundText) {
             elements.mpNewRoundText.textContent = canStart
@@ -2473,7 +2482,7 @@ function handleChatUpdate(messages) {
         const isOwn = msg.playerId === gameState.myPlayerId;
         const div = document.createElement('div');
         div.className = `chat-message ${isOwn ? 'own' : ''}`;
-        div.innerHTML = `
+        div.innerHTML = html`
             <div class="chat-message-sender">${msg.playerName}</div>
             <div class="chat-message-text">${msg.text}</div>
         `;
@@ -3025,7 +3034,7 @@ function renderMyCategoriesList() {
     cats.forEach(cat => {
         const card = document.createElement('div');
         card.className = 'my-cat-card';
-        card.innerHTML = `
+        card.innerHTML = html`
             <div class="my-cat-info">
                 <span class="my-cat-icon">${cat.icon || '📝'}</span>
                 <div>
@@ -3034,7 +3043,7 @@ function renderMyCategoriesList() {
                 </div>
             </div>
             <div class="my-cat-actions">
-                ${!cat.communityId ? `<button class="btn btn-primary btn-small" data-publish="${cat.id}" title="Publish to Community Hub">⬆️</button>` : ''}
+                ${!cat.communityId ? html`<button class="btn btn-primary btn-small" data-publish="${cat.id}" title="Publish to Community Hub">⬆️</button>` : ''}
                 <button class="btn btn-ghost btn-small" data-edit="${cat.id}">Edit</button>
                 <button class="btn btn-ghost btn-small btn-danger-text" data-delete="${cat.id}">Delete</button>
             </div>
@@ -3127,7 +3136,7 @@ function renderWordChips() {
     currentWords.forEach((word, idx) => {
         const chip = document.createElement('span');
         chip.className = 'word-chip';
-        chip.innerHTML = `${word} <button class="word-chip-remove" data-idx="${idx}">&times;</button>`;
+        chip.innerHTML = html`${word} <button class="word-chip-remove" data-idx="${idx}">&times;</button>`;
         chip.querySelector('.word-chip-remove').addEventListener('click', () => {
             currentWords.splice(idx, 1);
             renderWordChips();
@@ -3241,7 +3250,7 @@ function renderCommunityList(cats) {
         const card = document.createElement('div');
         card.className = 'community-card';
         card.dataset.communityId = cat.id;
-        card.innerHTML = `
+        card.innerHTML = html`
             <div class="community-card-header">
                 <span class="community-card-icon">${cat.icon || '📝'}</span>
                 <div class="community-card-info">
@@ -3477,6 +3486,16 @@ function initAuth() {
             }
 
             updateAuthStrip(user);
+            try {
+                const restored = await MP.restoreRoom();
+                if (restored) {
+                    gameState.mode = 'multiplayer';
+                    gameState.myPlayerId = restored.playerId;
+                    elements.lobbyRoomCode.textContent = restored.roomCode;
+                    MP.subscribeToRoom(handleRoomUpdate);
+                    MP.subscribeToChat(handleChatUpdate);
+                }
+            } catch (error) { console.warn('Room restore failed:', error.code); }
             if (user.displayName && elements.authorNameInput) {
                 elements.authorNameInput.placeholder = user.displayName;
             }
@@ -3548,4 +3567,3 @@ window.__voiceDebug = Voice.getDebugInfo;
 
 // Start the app
 document.addEventListener('DOMContentLoaded', init);
-
